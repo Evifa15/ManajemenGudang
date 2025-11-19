@@ -1,0 +1,13 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Mencegah penulisan ulang jika file atau direktori itu 'nyata'
+    # (Ini penting agar file CSS dan JS Anda bisa di-load)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Aturan utama:
+    # Tangkap semua URL (.*) dan kirim ke index.php
+    # sebagai parameter 'url'
+    RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+</IfModule>
