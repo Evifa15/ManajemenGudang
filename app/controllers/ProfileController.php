@@ -104,4 +104,83 @@ class ProfileController extends Controller {
         header('Location: ' . BASE_URL . 'profile/index');
         exit;
     }
+
+    /**
+     * Menampilkan Riwayat Absensi User (Support AJAX Realtime)
+     */
+    public function absensi($page = 1) {
+        // 1. Setup Filter
+        $filters = [
+            'user_id' => $_SESSION['user_id'], 
+            'month'   => $_GET['month'] ?? date('m'),
+            'year'    => $_GET['year'] ?? date('Y')
+        ];
+
+        // 2. Setup Paginasi
+        $limit = 10;
+        $page = (int)$page;
+        if ($page < 1) $page = 1;
+
+        // 3. Panggil Model
+        $absensiModel = $this->model('Absensi_model');
+        
+        $totalData = $absensiModel->getTotalAbsensiCount($filters);
+        $totalPages = ceil($totalData / $limit);
+        $offset = ($page - 1) * $limit;
+        $history = $absensiModel->getAbsensiPaginated($limit, $offset, $filters);
+
+        // --- 4. LOGIKA AJAX (BARU) ---
+        if (isset($_GET['ajax'])) {
+            $formattedData = [];
+            foreach ($history as $absen) {
+                $totalJam = '-';
+                $displayStatus = $absen['status'];
+                
+                // Kalkulasi Jam Kerja
+                if ($absen['status'] == 'Hadir') {
+                    if ($absen['waktu_masuk']) {
+                        if ($absen['waktu_pulang']) {
+                            $checkin = new DateTime($absen['waktu_masuk']);
+                            $checkout = new DateTime($absen['waktu_pulang']);
+                            $interval = $checkin->diff($checkout);
+                            $totalJam = $interval->format('%h jam %i mnt');
+                        } else {
+                            $displayStatus = 'Masih Bekerja';
+                        }
+                    }
+                }
+
+                $formattedData[] = [
+                    'tanggal'       => date('d-m-Y', strtotime($absen['tanggal'])),
+                    'waktu_masuk'   => $absen['waktu_masuk'] ? date('H:i', strtotime($absen['waktu_masuk'])) : '-',
+                    'waktu_pulang'  => $absen['waktu_pulang'] ? date('H:i', strtotime($absen['waktu_pulang'])) : '-',
+                    'total_jam'     => $totalJam,
+                    'status_raw'    => $absen['status'], // Status asli untuk logic warna di JS
+                    'display_status'=> $displayStatus,   // Status teks untuk ditampilkan
+                    'keterangan'    => $absen['keterangan'] ?? '-',
+                    'bukti_foto'    => $absen['bukti_foto']
+                ];
+            }
+
+            header('Content-Type: application/json');
+            echo json_encode([
+                'absensi' => $formattedData,
+                'totalPages' => $totalPages,
+                'currentPage' => $page
+            ]);
+            exit; // Stop di sini jika AJAX
+        }
+        // -----------------------------
+
+        // 5. Siapkan Data (Jika bukan AJAX)
+        $data = [
+            'judul' => 'Riwayat Absensi Saya',
+            'absensi' => $history,
+            'totalPages' => $totalPages,
+            'currentPage' => $page,
+            'filters' => $filters
+        ];
+        
+        $this->view('profile/history_absensi', $data);
+    }
 }

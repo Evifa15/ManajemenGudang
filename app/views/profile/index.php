@@ -18,6 +18,9 @@
     
     <div class="content-header">
         <h1>Profil Saya</h1>
+        <a href="<?php echo BASE_URL; ?>profile/absensi" class="btn btn-primary">
+            📅 Lihat Riwayat Absensi
+        </a>
     </div>
 
     <?php
