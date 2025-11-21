@@ -10,11 +10,7 @@ class ProfileController extends Controller {
             exit;
         }
         
-        // Cek jika status 'baru', paksa ganti password dulu
-        if (isset($_SESSION['status_login']) && $_SESSION['status_login'] == 'baru') {
-             header('Location: ' . BASE_URL . 'auth/forceChangePassword');
-            exit;
-        }
+        
     }
 
     /**

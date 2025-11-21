@@ -1,27 +1,18 @@
 <?php
 
 class StaffController extends Controller {
-
     public function __construct() {
-        // 1. GATEKEEPER: Pastikan sudah login
         if (!isset($_SESSION['is_logged_in'])) {
             header('Location: ' . BASE_URL . 'auth/index');
             exit;
         }
-
-        // 2. GATEKEEPER: Pastikan role-nya 'staff'
         if ($_SESSION['role'] != 'staff') {
             $_SESSION['flash_message'] = ['text' => 'Anda tidak memiliki hak akses.', 'type' => 'error'];
             header('Location: ' . BASE_URL . 'auth/index');
             exit;
-        }
-        
-        // 3. GATEKEEPER: Pastikan status 'aktif' (sudah ganti password)
-        if (isset($_SESSION['status_login']) && $_SESSION['status_login'] == 'baru') {
-             header('Location: ' . BASE_URL . 'auth/forceChangePassword');
-            exit;
-        }
+        }       
     }
+
     /**
      * Halaman Dashboard (Beranda) untuk Staff
      */
@@ -41,6 +32,59 @@ class StaffController extends Controller {
     ];
     $this->view('staff/dashboard', $data);
 }
+
+    /* --- MEMPROSES INPUT TIDAK HADIR (SAKIT/IZIN) --- */
+    public function processAbsenTidakHadir() {
+        if ($_SERVER['REQUEST_METHOD'] != 'POST') {
+            header('Location: ' . BASE_URL . 'staff/dashboard');
+            exit;
+        }
+        $absensiModel = $this->model('Absensi_model');
+        $today = $absensiModel->getTodayAttendance($_SESSION['user_id']);
+        if (!$today) { 
+            $buktiNama = null; 
+            if (isset($_FILES['bukti_foto']) && $_FILES['bukti_foto']['error'] == UPLOAD_ERR_OK) {
+                $file = $_FILES['bukti_foto'];
+                $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+                if (in_array($fileExt, $allowed)) {
+                    if ($file['size'] <= 2000000) {
+                        $buktiNama = "izin_" . $_SESSION['user_id'] . "_" . time() . "." . $fileExt;
+                        $destination = APPROOT . '/../public/uploads/bukti_absen/' . $buktiNama;
+                        if (!move_uploaded_file($file['tmp_name'], $destination)) {
+                            $_SESSION['flash_message'] = ['text' => 'Gagal mengupload bukti foto.', 'type' => 'error'];
+                            header('Location: ' . BASE_URL . 'staff/dashboard');
+                            exit;
+                        }
+                    } else {
+                        $_SESSION['flash_message'] = ['text' => 'Ukuran file terlalu besar (Maks 2MB).', 'type' => 'error'];
+                        header('Location: ' . BASE_URL . 'staff/dashboard');
+                        exit;
+                    }
+                } else {
+                    $_SESSION['flash_message'] = ['text' => 'Format file tidak didukung (Hanya JPG, PNG, PDF).', 'type' => 'error'];
+                    header('Location: ' . BASE_URL . 'staff/dashboard');
+                    exit;
+                }
+            }
+            $data = [
+                'user_id'    => $_SESSION['user_id'],
+                'status'     => $_POST['status'],      
+                'keterangan' => $_POST['keterangan'],
+                'bukti_foto' => $buktiNama 
+            ];
+            if ($absensiModel->addIzinSakit($data)) {
+                $_SESSION['flash_message'] = ['text' => 'Status kehadiran berhasil dicatat.', 'type' => 'success'];
+            } else {
+                $_SESSION['flash_message'] = ['text' => 'Gagal mencatat data ke database.', 'type' => 'error'];
+            }
+        } else {
+            $_SESSION['flash_message'] = ['text' => 'Anda sudah mengisi absensi hari ini.', 'type' => 'error'];
+        }
+        header('Location: ' . BASE_URL . 'staff/dashboard');
+        exit;
+    }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -546,4 +590,5 @@ public function processCheckOut() {
     header('Location: ' . BASE_URL . 'staff/dashboard');
     exit;
 }
+
 }

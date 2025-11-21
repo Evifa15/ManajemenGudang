@@ -100,4 +100,18 @@ class Merek_model extends Model {
         $this->query("SELECT * FROM " . $this->table . " ORDER BY nama_merek ASC");
         return $this->resultSet();
     }
+    /**
+     * Menghapus banyak merek sekaligus (Bulk Delete)
+     */
+    public function deleteBulkMerek($ids) {
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        
+        $this->query("DELETE FROM merek WHERE merek_id IN ($placeholders)");
+        
+        foreach ($ids as $k => $id) {
+            $this->bind(($k + 1), $id);
+        }
+        
+        return $this->execute();
+    }
 }

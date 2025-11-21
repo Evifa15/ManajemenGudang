@@ -101,21 +101,36 @@ class Status_model extends Model {
         $this->bind('id', $id, PDO::PARAM_INT);
         return $this->execute();
     }
-    // (Tambahkan ini di mana saja di dalam class Status_model)
+
+    /**
+     * Mengambil semua status (untuk dropdown)
+     */
     public function getAllStatus() {
         $this->query("SELECT * FROM " . $this->table . " ORDER BY nama_status ASC");
         return $this->resultSet();
     }
+
     /**
-     * Mengambil satu data status berdasarkan NAMA
-     * (Ini adalah fungsi yang hilang untuk fix error)
-     *
-     * @param string $nama Nama status
-     * @return array|false
+     * Mengambil ID status berdasarkan nama (Penting untuk logika 'Tersedia')
      */
     public function getStatusIdByName($nama) {
         $this->query("SELECT status_id FROM " . $this->table . " WHERE nama_status = :nama LIMIT 1");
         $this->bind('nama', $nama);
         return $this->single();
+    }
+
+    /**
+     * Menghapus banyak status sekaligus (Bulk Delete)
+     */
+    public function deleteBulkStatus($ids) {
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        
+        $this->query("DELETE FROM " . $this->table . " WHERE status_id IN ($placeholders)");
+        
+        foreach ($ids as $k => $id) {
+            $this->bind(($k + 1), $id);
+        }
+        
+        return $this->execute();
     }
 }

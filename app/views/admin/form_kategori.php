@@ -9,6 +9,7 @@
 <main class="app-content">
     
     <div class="content-header">
+        
         <h1><?php echo $isEditMode ? 'Edit Kategori' : 'Tambah Kategori Baru'; ?></h1>
     </div>
 
@@ -34,7 +35,7 @@
             
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary"><?php echo $isEditMode ? 'Update' : 'Simpan'; ?> Kategori</button>
-                <a href="<?php echo BASE_URL; ?>admin/kategori" class="btn btn-danger">Batal</a>
+                <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-kategori" class="btn btn-danger">Batal</a>
             </div>
 
         </form>

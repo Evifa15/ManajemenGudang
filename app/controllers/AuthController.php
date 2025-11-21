@@ -9,7 +9,7 @@ class AuthController extends Controller {
     public function processLogin() {
         
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . 'auth/index'); // PERBAIKAN URL
+            header('Location: ' . BASE_URL . 'auth/index');
             exit;
         }
 
@@ -17,31 +17,51 @@ class AuthController extends Controller {
         $password = $_POST['password'];
 
         $userModel = $this->model('User_model'); 
-        $user = $userModel->checkLogin($email, $password);
+        $result = $userModel->checkLogin($email, $password);
 
-        if ($user) {
-            // (Kita TIDAK perlu session_start() di sini,
-            // karena index.php sudah menjalankannya)
-
+        if ($result['status'] === 'SUCCESS') {
+            // ... (Logika Login Sukses TETAP SAMA seperti sebelumnya) ...
+            session_regenerate_id(true);
+            $user = $result['data'];
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
             $_SESSION['role'] = $user['role'];
             $_SESSION['is_logged_in'] = true;
+            $_SESSION['welcome_popup'] = $user['nama_lengkap']; 
             
-            // Simpan status_login di session untuk gatekeeper
-            $_SESSION['status_login'] = $user['status_login']; 
-
-            if ($user['status_login'] == 'baru') {
-                // Arahkan ke halaman ganti password paksa (URL CANTIK)
-                header('Location: ' . BASE_URL . 'auth/forceChangePassword'); // PERBAIKAN URL
-            } else {
-                $this->redirectBasedOnRole($user['role']);
-            }
+            $this->redirectBasedOnRole($user['role']);
             exit;
 
         } else {
-            // Kembalikan ke halaman login (URL CANTIK)
-            header('Location: ' . BASE_URL . 'auth/index?error=1'); // PERBAIKAN URL
+            // --- REVISI BAGIAN ERROR ---
+            
+            $pesan = '';
+            $tipe = 'alert-danger'; // Merah (Default)
+
+            switch ($result['status']) {
+                case 'EMAIL_NOT_FOUND':
+                    $pesan = '❌ <strong>Email Salah!</strong><br>Email tersebut tidak terdaftar.';
+                    break;
+                case 'PASSWORD_WRONG':
+                    $pesan = '🔑 <strong>Password Salah!</strong><br>Silakan coba lagi.';
+                    break;
+                case 'ACCOUNT_LOCKED':
+                case 'LOCKED_NOW':
+                    $pesan = '⚠️ <strong>Akun Terkunci!</strong><br>Gagal login 5x. Hubungi Admin.';
+                    $tipe = 'alert-warning'; // Kuning
+                    break;
+                default:
+                    $pesan = 'Terjadi kesalahan sistem.';
+            }
+
+            // SIMPAN KE SESSION (Flash Data)
+            $_SESSION['login_error'] = [
+                'pesan' => $pesan,
+                'tipe'  => $tipe
+            ];
+
+            // Redirect BERSIH (Tanpa ?error=...)
+            header('Location: ' . BASE_URL . 'auth/index'); 
             exit;
         }
     }
@@ -49,20 +69,11 @@ class AuthController extends Controller {
     private function redirectBasedOnRole($role) {
         $url = '';
         switch ($role) {
-            case 'admin':
-                $url = 'admin/dashboard';
-                break;
-            case 'staff':
-                $url = 'staff/dashboard';
-                break;
-            case 'pemilik':
-                $url = 'pemilik/dashboard';
-                break;
-            case 'peminjam':
-                $url = 'peminjam/dashboard';
-                break;
-            default:
-                $url = 'auth/index';
+            case 'admin': $url = 'admin/dashboard'; break;
+            case 'staff': $url = 'staff/dashboard'; break;
+            case 'pemilik': $url = 'pemilik/dashboard'; break;
+            case 'peminjam': $url = 'peminjam/dashboard'; break;
+            default: $url = 'auth/index';
         }
         header('Location: ' . BASE_URL . $url);
         exit;
@@ -134,11 +145,9 @@ class AuthController extends Controller {
      * Logika untuk Logout
      */
     public function logout() {
-        // PERBAIKAN: Hapus session_start()
-        
         session_unset();
         session_destroy();
-        header('Location: ' . BASE_URL . 'auth/index'); // PERBAIKAN URL
+        header('Location: ' . BASE_URL . 'auth/index');
         exit;
     }
 }

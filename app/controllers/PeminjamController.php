@@ -14,13 +14,7 @@ class PeminjamController extends Controller {
             $_SESSION['flash_message'] = ['text' => 'Anda tidak memiliki hak akses sebagai peminjam.', 'type' => 'error'];
             header('Location: ' . BASE_URL . 'auth/index');
             exit;
-        }
-        
-        // 3. GATEKEEPER: Pastikan status 'aktif'
-        if (isset($_SESSION['status_login']) && $_SESSION['status_login'] == 'baru') {
-             header('Location: ' . BASE_URL . 'auth/forceChangePassword');
-            exit;
-        }
+        } 
     }
 
     /**

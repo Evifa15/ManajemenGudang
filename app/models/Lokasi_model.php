@@ -112,4 +112,10 @@ class Lokasi_model extends Model {
         $this->query("SELECT * FROM " . $this->table . " ORDER BY kode_lokasi ASC");
         return $this->resultSet();
     }
+    public function deleteBulkLokasi($ids) {
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $this->query("DELETE FROM lokasi WHERE lokasi_id IN ($placeholders)");
+        foreach ($ids as $k => $id) { $this->bind(($k+1), $id); }
+        return $this->execute();
+    }
 }

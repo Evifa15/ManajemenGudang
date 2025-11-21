@@ -9,6 +9,7 @@
 <main class="app-content">
     
     <div class="content-header">
+        
         <h1><?php echo $isEditMode ? 'Edit Satuan' : 'Tambah Satuan Baru'; ?></h1>
     </div>
 
@@ -35,7 +36,7 @@
             
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary"><?php echo $isEditMode ? 'Update' : 'Simpan'; ?> Satuan</button>
-                <a href="<?php echo BASE_URL; ?>admin/satuan" class="btn btn-danger">Batal</a>
+                <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-satuan" class="btn btn-danger">Batal</a>
             </div>
 
         </form>

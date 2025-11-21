@@ -43,14 +43,6 @@
                 </select>
             </div>
 
-            <div class="form-group">
-                <label for="status_login">Status Login</label>
-                <select id="status_login" name="status_login" required>
-                    <option value="aktif" <?php if($user['status_login'] == 'aktif') echo 'selected'; ?>>Aktif</option>
-                    <option value="baru" <?php if($user['status_login'] == 'baru') echo 'selected'; ?>>Baru (Perlu Ganti Password)</option>
-                </select>
-            </div>
-
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Update Pengguna</button>
                 <!-- PERBAIKAN: Menghapus index.php?url= -->

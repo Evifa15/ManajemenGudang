@@ -106,4 +106,20 @@ class Kategori_model extends Model {
         $this->query("SELECT * FROM " . $this->table . " ORDER BY nama_kategori ASC");
         return $this->resultSet();
     }
+    /**
+     * Menghapus banyak kategori sekaligus (Bulk Delete)
+     */
+    public function deleteBulkKategori($ids) {
+        // Buat placeholder (?,?,?)
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        
+        $this->query("DELETE FROM kategori WHERE kategori_id IN ($placeholders)");
+        
+        // Bind parameter
+        foreach ($ids as $k => $id) {
+            $this->bind(($k + 1), $id);
+        }
+        
+        return $this->execute();
+    }
 }

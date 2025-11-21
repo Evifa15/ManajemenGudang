@@ -106,4 +106,10 @@ class Satuan_model extends Model {
         $this->query("SELECT * FROM " . $this->table . " ORDER BY nama_satuan ASC");
         return $this->resultSet();
     }
+    public function deleteBulkSatuan($ids) {
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $this->query("DELETE FROM satuan WHERE satuan_id IN ($placeholders)");
+        foreach ($ids as $k => $id) { $this->bind(($k+1), $id); }
+        return $this->execute();
+    }
 }

@@ -9,6 +9,7 @@
 <main class="app-content">
     
     <div class="content-header">
+
         <h1><?php echo $isEditMode ? 'Edit Merek' : 'Tambah Merek Baru'; ?></h1>
     </div>
 
@@ -28,7 +29,7 @@
             
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary"><?php echo $isEditMode ? 'Update' : 'Simpan'; ?> Merek</button>
-                <a href="<?php echo BASE_URL; ?>admin/merek" class="btn btn-danger">Batal</a>
+                <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-merek" class="btn btn-danger">Batal</a>
             </div>
 
         </form>

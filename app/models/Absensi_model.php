@@ -9,7 +9,7 @@ class Absensi_model extends Model {
     }
 
     /**
-     * Menghitung total data absensi (dengan filter)
+     * Menghitung total data absensi (dengan filter & search)
      */
     public function getTotalAbsensiCount($filters = []) {
         $sql = "SELECT COUNT(a.absen_id) as total 
@@ -18,6 +18,13 @@ class Absensi_model extends Model {
                 WHERE 1=1";
         
         $params = [];
+
+        // 🔥 PASTIKAN BAGIAN INI ADA 🔥
+        if (!empty($filters['search'])) {
+            $sql .= " AND (u.nama_lengkap LIKE :search OR u.email LIKE :search)";
+            $params[':search'] = '%' . $filters['search'] . '%';
+        }
+        // -----------------------------
 
         if (!empty($filters['user_id'])) {
             $sql .= " AND a.user_id = :user_id";
@@ -39,17 +46,17 @@ class Absensi_model extends Model {
         return $this->single()['total'];
     }
 
-    /**
-     * Mengambil data absensi dengan paginasi (dengan filter)
-     */
+    /* --- MENGAMBIL DATA DENGAN PAGINASI (SEARCH DAN FILTER) --- */
     public function getAbsensiPaginated($limit, $offset, $filters = []) {
-        $sql = "SELECT a.tanggal, a.waktu_masuk, a.waktu_pulang, u.nama_lengkap
-                FROM " . $this->table . " a
-                LEFT JOIN users u ON a.user_id = u.user_id
-                WHERE 1=1";
-        
+        $sql = "SELECT a.absen_id, a.tanggal, a.waktu_masuk, a.waktu_pulang, a.status, a.bukti_foto, u.nama_lengkap
+            FROM " . $this->table . " a
+            LEFT JOIN users u ON a.user_id = u.user_id
+            WHERE 1=1";
         $params = [];
-
+        if (!empty($filters['search'])) {
+            $sql .= " AND (u.nama_lengkap LIKE :search OR u.email LIKE :search)";
+            $params[':search'] = '%' . $filters['search'] . '%';
+        }
         if (!empty($filters['user_id'])) {
             $sql .= " AND a.user_id = :user_id";
             $params[':user_id'] = $filters['user_id'];
@@ -62,19 +69,20 @@ class Absensi_model extends Model {
             $sql .= " AND YEAR(a.tanggal) = :year";
             $params[':year'] = $filters['year'];
         }
-
         $sql .= " ORDER BY a.tanggal DESC, a.waktu_masuk DESC LIMIT :limit OFFSET :offset";
         $params[':limit'] = $limit;
         $params[':offset'] = $offset;
-
         $this->query($sql);
         foreach ($params as $key => &$value) {
-            $type = ($key == ':limit' || $key == ':offset' || $key == ':user_id' || $key == ':month' || $key == ':year') ? PDO::PARAM_INT : PDO::PARAM_STR;
+            $type = ($key == ':limit' || $key == ':offset') ? PDO::PARAM_INT : PDO::PARAM_STR;
+            if (in_array($key, [':user_id', ':month', ':year'])) {
+                $type = PDO::PARAM_INT;
+            }
             $this->bind($key, $value, $type);
-        }
-        
+        }      
         return $this->resultSet();
     }
+
     /**
      * [DASHBOARD] Menghitung jumlah staf yang hadir hari ini
      */
@@ -114,10 +122,21 @@ class Absensi_model extends Model {
      * @return bool
      */
     public function checkInUser($userId) {
-        $this->query("INSERT INTO " . $this->table . " (user_id, tanggal, waktu_masuk) 
-                      VALUES (:uid, CURDATE(), CURTIME())");
+        // Set default status 'Hadir' saat check-in
+        $this->query("INSERT INTO " . $this->table . " (user_id, tanggal, waktu_masuk, status) 
+                    VALUES (:uid, CURDATE(), CURTIME(), 'Hadir')");
         $this->bind('uid', $userId, PDO::PARAM_INT);
         return $this->execute();
+        }
+
+    public function addIzinSakit($data) {
+    $this->query("INSERT INTO " . $this->table . " (user_id, tanggal, status, keterangan, bukti_foto) 
+                  VALUES (:uid, CURDATE(), :status, :ket, :bukti)");
+    $this->bind('uid', $data['user_id'], PDO::PARAM_INT);
+    $this->bind('status', $data['status']);
+    $this->bind('ket', $data['keterangan']);
+    $this->bind('bukti', $data['bukti_foto']); 
+    return $this->execute();
     }
 
     /**
@@ -129,6 +148,24 @@ class Absensi_model extends Model {
         $this->query("UPDATE " . $this->table . " SET waktu_pulang = CURTIME() 
                       WHERE absen_id = :aid AND waktu_pulang IS NULL");
         $this->bind('aid', $absenId, PDO::PARAM_INT);
+        return $this->execute();
+    }
+
+    /**
+     * [ADMIN] Update manual data absensi (Edit Jam)
+     */
+    public function updateAbsensi($id, $masuk, $pulang) {
+        // Jika pulang kosong, set NULL
+        $pulangVal = !empty($pulang) ? $pulang : null;
+
+        $this->query("UPDATE " . $this->table . " 
+                      SET waktu_masuk = :masuk, waktu_pulang = :pulang 
+                      WHERE absen_id = :id");
+        
+        $this->bind('masuk', $masuk);
+        $this->bind('pulang', $pulangVal);
+        $this->bind('id', $id);
+        
         return $this->execute();
     }
 }

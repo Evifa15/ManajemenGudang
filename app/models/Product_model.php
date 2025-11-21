@@ -22,7 +22,12 @@ class Product_model extends Model {
 
         // --- INI ADALAH FILTER YANG HILANG ---
         if (!empty($search)) {
-            $whereClauses[] = "(p.kode_barang LIKE :search OR p.nama_barang LIKE :search)";
+            $whereClauses[] = "(
+                p.kode_barang LIKE :search 
+                OR p.nama_barang LIKE :search 
+                OR k.nama_kategori LIKE :search 
+                OR m.nama_merek LIKE :search
+            )";
             $params[':search'] = '%' . $search . '%';
         }
         if (!empty($kategori)) {
@@ -87,8 +92,13 @@ class Product_model extends Model {
 
         // --- INI ADALAH FILTER YANG HILANG ---
         if (!empty($search)) {
-            $whereClauses[] = "(p.kode_barang LIKE :search OR p.nama_barang LIKE :search)";
-            $params[':search'] = '%' . $search . '%';
+            $whereClauses[] = "(
+                p.kode_barang LIKE :search 
+                OR p.nama_barang LIKE :search 
+                OR k.nama_kategori LIKE :search 
+                OR m.nama_merek LIKE :search
+            )";
+    $params[':search'] = '%' . $search . '%';
         }
         if (!empty($kategori)) {
             $whereClauses[] = "p.kategori_id = :kategori";
@@ -341,4 +351,18 @@ class Product_model extends Model {
                       WHERE COALESCE(stok.total_stok, 0) < p.stok_minimum");
         return $this->single()['total'];
     }
+    public function deleteBulkProducts($ids) {
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        
+        // Hapus Stok dulu (Foreign Key)
+        $this->query("DELETE FROM product_stock WHERE product_id IN ($placeholders)");
+        foreach ($ids as $k => $id) { $this->bind(($k+1), $id); }
+        $this->execute();
+
+        // Hapus Master Produk
+        $this->query("DELETE FROM products WHERE product_id IN ($placeholders)");
+        foreach ($ids as $k => $id) { $this->bind(($k+1), $id); }
+        return $this->execute();
+    }
+    
 }

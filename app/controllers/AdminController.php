@@ -1,20 +1,12 @@
 <?php
 
 class AdminController extends Controller {
-
     public function __construct() {
-        // AKTIFKAN GATEKEEPER!
-        // (index.php sudah memulai session, jadi kita tinggal cek)
-        
         if (!isset($_SESSION['is_logged_in'])) {
-            // Jika belum login, tendang ke halaman login
             header('Location: ' . BASE_URL . 'auth/index');
             exit;
         }
-
         if ($_SESSION['role'] != 'admin') {
-            // Jika sudah login TAPI BUKAN admin, tendang juga
-            // (Nanti kita bisa buat halaman 'Access Denied')
             header('Location: ' . BASE_URL . 'auth/index');
             exit;
         }
@@ -95,6 +87,60 @@ public function dashboard() {
 
     $this->view('admin/dashboard', $data);
 }
+
+    /* --- MEMPROSES INPUT TIDAK HADIR (SAKIT/IZIN) --- */
+    public function processAbsenTidakHadir() {
+        if ($_SERVER['REQUEST_METHOD'] != 'POST') {
+            header('Location: ' . BASE_URL . 'admin/dashboard');
+            exit;
+        }
+        $absensiModel = $this->model('Absensi_model');
+        $today = $absensiModel->getTodayAttendance($_SESSION['user_id']);
+        if (!$today) { 
+            $buktiNama = null; 
+            if (isset($_FILES['bukti_foto']) && $_FILES['bukti_foto']['error'] == UPLOAD_ERR_OK) {
+                $file = $_FILES['bukti_foto'];
+                $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+                if (in_array($fileExt, $allowed)) {
+                    if ($file['size'] <= 2000000) {
+                        $buktiNama = "izin_" . $_SESSION['user_id'] . "_" . time() . "." . $fileExt;
+                        $destination = APPROOT . '/../public/uploads/bukti_absen/' . $buktiNama;
+                        if (!move_uploaded_file($file['tmp_name'], $destination)) {
+                            $_SESSION['flash_message'] = ['text' => 'Gagal mengupload bukti foto.', 'type' => 'error'];
+                            header('Location: ' . BASE_URL . 'admin/dashboard');
+                            exit;
+                        }
+                    } else {
+                        $_SESSION['flash_message'] = ['text' => 'Ukuran file terlalu besar (Maks 2MB).', 'type' => 'error'];
+                        header('Location: ' . BASE_URL . 'admin/dashboard');
+                        exit;
+                    }
+                } else {
+                    $_SESSION['flash_message'] = ['text' => 'Format file tidak didukung (Hanya JPG, PNG, PDF).', 'type' => 'error'];
+                    header('Location: ' . BASE_URL . 'admin/dashboard');
+                    exit;
+                }
+            }
+            $data = [
+                'user_id'    => $_SESSION['user_id'],
+                'status'     => $_POST['status'],      
+                'keterangan' => $_POST['keterangan'],
+                'bukti_foto' => $buktiNama 
+            ];
+            if ($absensiModel->addIzinSakit($data)) {
+                $_SESSION['flash_message'] = ['text' => 'Status kehadiran berhasil dicatat.', 'type' => 'success'];
+            } else {
+                $_SESSION['flash_message'] = ['text' => 'Gagal mencatat data ke database.', 'type' => 'error'];
+            }
+        } else {
+            $_SESSION['flash_message'] = ['text' => 'Anda sudah mengisi absensi hari ini.', 'type' => 'error'];
+        }
+        header('Location: ' . BASE_URL . 'admin/dashboard');
+        exit;
+    }
+
+
 /**
      * Menampilkan halaman Manajemen Pengguna (DENGAN PAGINASI, SEARCH & FILTER)
      * URL: /admin/users/[halaman]
@@ -105,10 +151,9 @@ public function dashboard() {
         // 1. Ambil semua parameter GET
         $search = $_GET['search'] ?? '';
         $role = $_GET['role'] ?? '';
-        $status = $_GET['status'] ?? '';
 
         // 2. Tentukan Limit
-        $limit = 50; 
+        $limit = 10; 
 
         // 3. Bersihkan nomor halaman
         $page = (int)$page;
@@ -120,15 +165,37 @@ public function dashboard() {
         $userModel = $this->model('User_model');
         
         // 5. Hitung Total Data (dengan filter)
-        $totalUsers = $userModel->getTotalUserCount($search, $role, $status);
+        $totalUsers = $userModel->getTotalUserCount($search, $role);
         $totalPages = ceil($totalUsers / $limit);
 
         // 6. Hitung Offset
         $offset = ($page - 1) * $limit;
 
         // 7. Ambil data untuk halaman saat ini (dengan filter)
-        $paginatedUsers = $userModel->getUsersPaginated($limit, $offset, $search, $role, $status);
+        $paginatedUsers = $userModel->getUsersPaginated($limit, $offset, $search, $role);
 
+        // 🔥 [BARU] LOGIKA AJAX REQUEST UNTUK LIVE SEARCH 🔥
+        // Jika request ini dikirim oleh Javascript (ada parameter 'ajax'), 
+        // kirimkan data JSON saja, jangan load view HTML.
+        if (isset($_GET['ajax'])) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'users' => $paginatedUsers,
+                'totalPages' => $totalPages,
+                'currentPage' => $page
+            ]);
+            exit; // Stop eksekusi di sini!
+        }
+        // 🔥 AKHIR LOGIKA BARU 🔥
+        if (isset($_GET['ajax'])) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'users' => $paginatedUsers,
+                'totalPages' => $totalPages,
+                'currentPage' => $page
+            ]);
+            exit; // Stop, jangan load view di bawahnya
+        }
         // 8. Siapkan data untuk dikirim ke view
         $data = [
             'judul' => 'Manajemen Pengguna',
@@ -137,7 +204,6 @@ public function dashboard() {
             'currentPage' => $page,
             'search' => $search, // Kirim term ke view
             'role' => $role,     // Kirim role ke view
-            'status' => $status  // Kirim status ke view
         ];
         
         // 9. Muat file view
@@ -165,34 +231,42 @@ public function dashboard() {
                 'nama_lengkap' => $_POST['nama_lengkap'],
                 'email' => $_POST['email'],
                 'password' => $_POST['password'],
-                'role' => $_POST['role'],
-                'status_login' => $_POST['status_login']
+                'role' => $_POST['role']
             ];
 
-            // 2. Panggil model untuk menyimpan data
             $userModel = $this->model('User_model');
-            if ($userModel->createUser($data)) {
-                // Set notifikasi sukses
-                $_SESSION['flash_message'] = [
-                    'text' => 'Data pengguna baru berhasil ditambahkan.',
-                    'type' => 'success' // 'success' atau 'error'
-                ];
-                // 3. Jika berhasil, kembalikan ke halaman daftar user
-                header('Location: ' . BASE_URL . 'admin/users');
-                exit;
-            } else {
-                // Set notifikasi error
-                $_SESSION['flash_message'] = [
-                    'text' => 'Gagal menambahkan pengguna.',
-                    'type' => 'error'
-                ];
-                die('Gagal menambahkan user.');
-                // header('Location: ' . BASE_URL . 'index.php?url=admin/addUser');
-                // exit;
+
+            try {
+                // 2. Coba simpan ke database
+                if ($userModel->createUser($data)) {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Data pengguna baru berhasil ditambahkan.',
+                        'type' => 'success'
+                    ];
+                }
+            } catch (PDOException $e) {
+                // 3. TANGKAP ERROR JIKA GAGAL
+                
+                // Cek Kode Error 1062 (Duplicate Entry / Email Kembar)
+                if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Gagal! Email "' . htmlspecialchars($_POST['email']) . '" sudah terdaftar.',
+                        'type' => 'error'
+                    ];
+                } else {
+                    // Error database lainnya
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Gagal menambahkan pengguna: ' . $e->getMessage(),
+                        'type' => 'error'
+                    ];
+                }
             }
 
+            // 4. Kembali ke halaman daftar user
+            header('Location: ' . BASE_URL . 'admin/users');
+            exit;
+
         } else {
-            // Jika bukan POST, tendang kembali
             header('Location: ' . BASE_URL . 'admin/users');
             exit;
         }
@@ -223,40 +297,48 @@ public function dashboard() {
     public function processUpdateUser() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
-            // 1. Kumpulkan data dari form
             $data = [
-                'user_id' => $_POST['user_id'], // PENTING
+                'user_id' => $_POST['user_id'],
                 'nama_lengkap' => $_POST['nama_lengkap'],
                 'email' => $_POST['email'],
-                'password' => $_POST['password'], // Biarkan kosong jika tidak ganti
-                'role' => $_POST['role'],
-                'status_login' => $_POST['status_login']
+                'password' => $_POST['password'],
+                'role' => $_POST['role']
             ];
 
-            // 2. Panggil model untuk mengupdate data
             $userModel = $this->model('User_model');
-            if ($userModel->updateUser($data)) {
-                $_SESSION['flash_message'] = [
-                    'text' => 'Data pengguna berhasil di-update.',
-                    'type' => 'success'
-                ];
-                // 3. Jika berhasil, kembalikan ke halaman daftar user
-                header('Location: ' . BASE_URL . 'admin/users');
-                exit;
-            } else {
-                die('Gagal mengupdate user.');
+
+            try {
+                // Coba Update
+                if ($userModel->updateUser($data)) {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Data pengguna berhasil di-update.',
+                        'type' => 'success'
+                    ];
+                }
+            } catch (PDOException $e) {
+                // Tangkap Error Duplikat saat Edit
+                if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Gagal Update! Email "' . htmlspecialchars($_POST['email']) . '" sudah dipakai user lain.',
+                        'type' => 'error'
+                    ];
+                } else {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Gagal mengupdate user: ' . $e->getMessage(),
+                        'type' => 'error'
+                    ];
+                }
             }
 
+            header('Location: ' . BASE_URL . 'admin/users');
+            exit;
+
         } else {
-            $_SESSION['flash_message'] = [
-                    'text' => 'Gagal mengupdate pengguna.',
-                    'type' => 'error'
-                ];
-            // Jika bukan POST, tendang kembali
             header('Location: ' . BASE_URL . 'admin/users');
             exit;
         }
     }
+
     /**
      * Menghapus pengguna (dipanggil oleh link)
      * @param int $id ID user dari URL
@@ -296,6 +378,7 @@ public function dashboard() {
     }
     /**
      * Memproses file CSV yang di-upload untuk import pengguna
+     * Format CSV Wajib: Nama Lengkap, Email, Password, Role
      */
     public function importUsers() {
         // 1. Validasi request
@@ -316,42 +399,55 @@ public function dashboard() {
 
         // 4. Baca dan Parsing File CSV
         $usersToImport = [];
-        // 'fopen' untuk membuka file
+        
         if (($handle = fopen($filePath, "r")) !== FALSE) {
             
-            // 'fgetcsv' untuk membaca baris per baris
-            // (Kita asumsikan tidak ada header, jika ada, lewati baris pertama)
-            // fgetcsv($handle, 1000, ","); // <-- Aktifkan ini jika ada header
+            // (Opsional) Lewati baris pertama jika itu adalah HEADER
+            // fgetcsv($handle, 1000, ","); 
 
             while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                // Asumsi: [0] = Nama, [1] = Email, [2] = Role
-                if (count($data) >= 3) {
-                    $usersToImport[] = [
-                        'nama_lengkap' => $data[0],
-                        'email'        => $data[1],
-                        'role'         => $data[2],
-                        'password'     => bin2hex(random_bytes(4)), // Password acak (e.g., 'a8f5b301')
-                        'status_login' => 'baru'
-                    ];
+                // Kita butuh minimal 4 kolom: Nama, Email, Password, Role
+                if (count($data) >= 4) {
+                    // Bersihkan data
+                    $nama = trim($data[0]);
+                    $email = trim($data[1]);
+                    $rawPassword = trim($data[2]); // Password dari CSV
+                    $role = strtolower(trim($data[3])); // Pastikan lowercase (admin, staff, dll)
+
+                    // Validasi sederhana
+                    if (!empty($nama) && !empty($email) && !empty($rawPassword) && !empty($role)) {
+                        $usersToImport[] = [
+                            'nama_lengkap' => $nama,
+                            'email'        => $email,
+                            'password'     => $rawPassword, // Kirim password asli ke Model (nanti di-hash di sana)
+                            'role'         => $role
+                            // 'status_login' sudah TIDAK ADA
+                        ];
+                    }
                 }
             }
-            fclose($handle); // Tutup file
+            fclose($handle); 
         }
 
         // 5. Kirim data ke Model
         if (!empty($usersToImport)) {
             $userModel = $this->model('User_model');
+            
+            // Model User_model->importUsers() kamu sudah aman
+            // karena dia akan melakukan hashing password di dalam looping-nya.
             $result = $userModel->importUsers($usersToImport);
 
             if (isset($result['error'])) {
-                // Gagal total (transaksi di-rollback)
                 $_SESSION['flash_message'] = ['text' => 'Import Gagal Total! Error: ' . $result['error'], 'type' => 'error'];
             } else {
-                // Sukses
-                $_SESSION['flash_message'] = ['text' => "Import Selesai. Berhasil: {$result['success']}. Gagal: {$result['fail']}.", 'type' => 'success'];
+                $msg = "Import Selesai. Berhasil: {$result['success']}. Gagal: {$result['fail']}.";
+                if (!empty($result['failed_emails'])) {
+                    $msg .= " (Email duplikat: " . implode(', ', $result['failed_emails']) . ")";
+                }
+                $_SESSION['flash_message'] = ['text' => $msg, 'type' => 'success'];
             }
         } else {
-            $_SESSION['flash_message'] = ['text' => 'File CSV kosong atau formatnya salah.', 'type' => 'error'];
+            $_SESSION['flash_message'] = ['text' => 'File CSV kosong atau format salah (Butuh 4 Kolom).', 'type' => 'error'];
         }
 
         // 6. Kembalikan ke halaman daftar user
@@ -461,8 +557,8 @@ public function dashboard() {
             }
         }
 
-        header('Location: ' . BASE_URL . 'admin/suppliers');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-supplier');
+exit;
     }
 
     /**
@@ -481,8 +577,8 @@ public function dashboard() {
             $_SESSION['flash_message'] = ['text' => 'Gagal menghapus supplier.', 'type' => 'error'];
         }
 
-        header('Location: ' . BASE_URL . 'admin/suppliers');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-supplier');
+exit;
     }
     /*
     |--------------------------------------------------------------------------
@@ -584,8 +680,8 @@ public function dashboard() {
             }
         }
 
-        header('Location: ' . BASE_URL . 'admin/lokasi');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-lokasi');
+exit;
     }
 
     /**
@@ -600,8 +696,8 @@ public function dashboard() {
             $_SESSION['flash_message'] = ['text' => 'Gagal menghapus lokasi.', 'type' => 'error'];
         }
 
-        header('Location: ' . BASE_URL . 'admin/lokasi');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-lokasi');
+exit;
     }
     /*
     |--------------------------------------------------------------------------
@@ -702,8 +798,8 @@ public function dashboard() {
             }
         }
 
-        header('Location: ' . BASE_URL . 'admin/kategori');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-kategori');
+    exit;
     }
 
     /**
@@ -721,8 +817,8 @@ public function dashboard() {
             $_SESSION['flash_message'] = ['text' => 'Gagal menghapus kategori.', 'type' => 'error'];
         }
 
-        header('Location: ' . BASE_URL . 'admin/kategori');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-kategori');
+    exit;
     }
     /*
     |--------------------------------------------------------------------------
@@ -822,8 +918,8 @@ public function dashboard() {
             }
         }
 
-        header('Location: ' . BASE_URL . 'admin/merek');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-merek');
+    exit;
     }
 
     /**
@@ -841,8 +937,8 @@ public function dashboard() {
             $_SESSION['flash_message'] = ['text' => 'Gagal menghapus merek.', 'type' => 'error'];
         }
 
-        header('Location: ' . BASE_URL . 'admin/merek');
-        exit;
+            header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-merek');
+    exit;
     }
     /*
     |--------------------------------------------------------------------------
@@ -943,8 +1039,8 @@ public function dashboard() {
             }
         }
 
-        header('Location: ' . BASE_URL . 'admin/satuan');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-satuan');
+exit;;
     }
 
     /**
@@ -962,8 +1058,8 @@ public function dashboard() {
             $_SESSION['flash_message'] = ['text' => 'Gagal menghapus satuan.', 'type' => 'error'];
         }
 
-        header('Location: ' . BASE_URL . 'admin/satuan');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-satuan');
+exit;
     }
     /*
     |--------------------------------------------------------------------------
@@ -1064,8 +1160,8 @@ public function dashboard() {
             }
         }
 
-        header('Location: ' . BASE_URL . 'admin/status');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-status');
+exit;
     }
 
     /**
@@ -1083,8 +1179,8 @@ public function dashboard() {
             $_SESSION['flash_message'] = ['text' => 'Gagal menghapus status.', 'type' => 'error'];
         }
 
-        header('Location: ' . BASE_URL . 'admin/status');
-        exit;
+        header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-status');
+exit;
     }
     /*
     |--------------------------------------------------------------------------
@@ -1096,57 +1192,86 @@ public function dashboard() {
      * Menampilkan halaman Manajemen Barang
      */
     public function barang($page = 1) {
-        // 1. Ambil semua parameter GET
-        $search = $_GET['search'] ?? '';
-        $kategori = $_GET['kategori'] ?? '';
-        $merek = $_GET['merek'] ?? '';
-        $status = $_GET['status'] ?? '';
-        $satuan = $_GET['satuan'] ?? ''; // <-- TAMBAHKAN
-        $lokasi = $_GET['lokasi'] ?? ''; // <-- TAMBAHKAN
-        $limit = 50;
+    // 1. Ambil parameter
+    $search = $_GET['search'] ?? '';
+    $kategori = $_GET['kategori'] ?? '';
+    $merek = $_GET['merek'] ?? '';
+    $status = $_GET['status'] ?? '';
+    $satuan = $_GET['satuan'] ?? '';
+    $lokasi = $_GET['lokasi'] ?? '';
+    $limit = 10;
+    $page = (int)$page;
+    if ($page < 1) $page = 1;
 
-        $page = (int)$page;
-        if ($page < 1) $page = 1;
+    $productModel = $this->model('Product_model');
+    
+    // 2. Hitung Data
+    $totalProducts = $productModel->getTotalProductCount($search, $kategori, $merek, $status, $satuan, $lokasi);
+    $totalPages = ceil($totalProducts / $limit);
+    $offset = ($page - 1) * $limit;
+    $paginatedProducts = $productModel->getProductsPaginated($limit, $offset, $search, $kategori, $merek, $status, $satuan, $lokasi);
 
-        $productModel = $this->model('Product_model');
+    // 3. [BARU] Cek Apakah ini Request AJAX?
+    if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
+        // Jika iya, kirim JSON dan STOP di sini.
+        header('Content-Type: application/json');
         
-        // 2. Hitung Total Data (dengan filter baru)
-        $totalProducts = $productModel->getTotalProductCount($search, $kategori, $merek, $status, $satuan, $lokasi);
-        $totalPages = ceil($totalProducts / $limit);
-        $offset = ($page - 1) * $limit;
-        
-        // 3. Ambil data untuk halaman ini (dengan filter baru)
-        $paginatedProducts = $productModel->getProductsPaginated($limit, $offset, $search, $kategori, $merek, $status, $satuan, $lokasi);
+        // Kita perlu render baris tabel menjadi HTML string agar mudah dipasang di JS
+        $html = '';
+        if (empty($paginatedProducts)) {
+            $html = '<tr><td colspan="9" style="text-align:center;">Data tidak ditemukan.</td></tr>';
+        } else {
+            foreach ($paginatedProducts as $prod) {
+                // URL untuk tombol edit/hapus
+                $editUrl = BASE_URL . 'admin/editBarang/' . $prod['product_id'];
+                $deleteUrl = BASE_URL . 'admin/deleteBarang/' . $prod['product_id'];
+                
+                $html .= '<tr>';
+                $html .= '<td style="text-align:center;">
+                            <input type="checkbox" class="row-checkbox" value="'.$prod['product_id'].'" style="transform: scale(1.2);">
+                          </td>';
+                $html .= '<td>' . htmlspecialchars($prod['kode_barang']) . '</td>';
+                $html .= '<td>' . htmlspecialchars($prod['nama_barang']) . '</td>';
+                $html .= '<td>' . htmlspecialchars($prod['nama_kategori']) . '</td>';
+                $html .= '<td>' . htmlspecialchars($prod['nama_merek']) . '</td>';
+                $html .= '<td><strong>' . (int)$prod['stok_saat_ini'] . '</strong></td>';
+                $html .= '<td>' . htmlspecialchars($prod['nama_satuan']) . '</td>';
+                $html .= '<td>' . htmlspecialchars($prod['stok_minimum']) . '</td>';
+                $html .= '<td>' . htmlspecialchars($prod['kode_lokasi']) . '</td>';
+                $html .= '<td>
+                            <a href="'.$editUrl.'" class="btn btn-warning btn-sm">Edit</a>
+                            <button type="button" class="btn btn-danger btn-sm btn-delete" data-url="'.$deleteUrl.'">Hapus</button>
+                          </td>';
+                $html .= '</tr>';
+            }
+        }
 
-        // 4. Ambil data untuk SEMUA filter dropdown
-        $allKategori = $this->model('Kategori_model')->getAllKategori();
-        $allMerek = $this->model('Merek_model')->getAllMerek();
-        $allStatus = $this->model('Status_model')->getAllStatus();
-        $allSatuan = $this->model('Satuan_model')->getAllSatuan(); // <-- TAMBAHKAN
-        $allLokasi = $this->model('Lokasi_model')->getAllLokasi(); // <-- TAMBAHKAN
-
-        // 5. Siapkan data untuk dikirim ke view
-        $data = [
-            'judul' => 'Manajemen Barang',
-            'products' => $paginatedProducts,
-            'totalPages' => $totalPages,
-            'currentPage' => $page,
-            // Data untuk filter
-            'search' => $search,
-            'kategori_filter' => $kategori,
-            'merek_filter' => $merek,
-            'status_filter' => $status,
-            'satuan_filter' => $satuan, // <-- TAMBAHKAN
-            'lokasi_filter' => $lokasi, // <-- TAMBAHKAN
-            'allKategori' => $allKategori,
-            'allMerek' => $allMerek,
-            'allStatus' => $allStatus,
-            'allSatuan' => $allSatuan, // <-- TAMBAHKAN
-            'allLokasi' => $allLokasi  // <-- TAMBAHKAN
-        ];
-        
-        $this->view('admin/manage_barang', $data);
+        echo json_encode(['html' => $html, 'totalPages' => $totalPages]);
+        exit; // PENTING: Stop script PHP di sini
     }
+
+    // 4. Jika bukan AJAX, load View seperti biasa (Kode Lama)
+    $data = [
+        'judul' => 'Manajemen Barang',
+        'products' => $paginatedProducts,
+        'totalPages' => $totalPages,
+        'currentPage' => $page,
+        'search' => $search,
+        // ... (sisa data filter lainnya sama) ...
+        'kategori_filter' => $kategori,
+        'merek_filter' => $merek,
+        'status_filter' => $status,
+        'satuan_filter' => $satuan,
+        'lokasi_filter' => $lokasi,
+        'allKategori' => $this->model('Kategori_model')->getAllKategori(),
+        'allMerek' => $this->model('Merek_model')->getAllMerek(),
+        'allStatus' => $this->model('Status_model')->getAllStatus(),
+        'allSatuan' => $this->model('Satuan_model')->getAllSatuan(),
+        'allLokasi' => $this->model('Lokasi_model')->getAllLokasi()
+    ];
+    
+    $this->view('admin/manage_barang', $data);
+}
 
     /**
      * Menampilkan halaman form tambah barang
@@ -1616,37 +1741,78 @@ public function dashboard() {
     }
     /**
      * Menampilkan Halaman Rekap Absensi (Admin View)
-     * (Logika ini SAMA PERSIS dengan PemilikController)
+     * UPDATE: Support AJAX Real-time Filter
      */
     public function rekapAbsensi($page = 1) {
         // 1. Ambil filter
         $filters = [
-            'user_id' => $_GET['user_id'] ?? null,
-            'month' => $_GET['month'] ?? date('m'), // Default bulan ini
-            'year' => $_GET['year'] ?? date('Y')   // Default tahun ini
+            'search'  => $_GET['search'] ?? '',
+            'user_id' => $_GET['user_id'] ?? '',
+            'month'   => $_GET['month'] ?? date('m'), // Default bulan ini
+            'year'    => $_GET['year'] ?? date('Y')   // Default tahun ini
         ];
-        $limit = 50;
+
+        // 2. Setup Paginasi (Default 10 baris)
+        $limit = 10;
         $page = (int)$page;
         if ($page < 1) $page = 1;
 
-        // 2. Panggil Model yang SUDAH ADA
+        // 3. Panggil Model
         $absensiModel = $this->model('Absensi_model');
         
-        // 3. Hitung Total Data
+        // 4. Hitung Data
         $totalAbsensi = $absensiModel->getTotalAbsensiCount($filters);
         $totalPages = ceil($totalAbsensi / $limit);
         $offset = ($page - 1) * $limit;
-        
-        // 4. Ambil data
         $paginatedAbsensi = $absensiModel->getAbsensiPaginated($limit, $offset, $filters);
 
-        // 5. Ambil data untuk dropdown filter (Staff & Admin)
+        // 🔥 LOGIKA AJAX (BARU) 🔥
+        if (isset($_GET['ajax'])) {
+            // Format ulang data untuk JSON
+            $formattedData = [];
+            foreach ($paginatedAbsensi as $absen) {
+                $totalJam = '-';
+                $status = 'Alpa';
+                
+                if ($absen['waktu_masuk']) {
+                    $status = 'Hadir';
+                    if ($absen['waktu_pulang']) {
+                        $checkin = new DateTime($absen['waktu_masuk']);
+                        $checkout = new DateTime($absen['waktu_pulang']);
+                        $interval = $checkin->diff($checkout);
+                        $totalJam = $interval->format('%h jam %i mnt');
+                    } else {
+                        $status = 'Masih Bekerja';
+                    }
+                }
+
+                $formattedData[] = [
+                    'absen_id'      => $absen['absen_id'], // Pastikan model ambil ID ini
+                    'tanggal'       => date('d-m-Y', strtotime($absen['tanggal'])),
+                    'nama_lengkap'  => htmlspecialchars($absen['nama_lengkap']),
+                    'waktu_masuk'   => $absen['waktu_masuk'] ? date('H:i:s', strtotime($absen['waktu_masuk'])) : '-',
+                    'waktu_pulang'  => $absen['waktu_pulang'] ? date('H:i:s', strtotime($absen['waktu_pulang'])) : '-',
+                    'total_jam'     => $totalJam,
+                    'status'        => $status
+                ];
+            }
+
+            header('Content-Type: application/json');
+            echo json_encode([
+                'absensi' => $formattedData,
+                'totalPages' => $totalPages,
+                'currentPage' => $page
+            ]);
+            exit;
+        }
+
+        // 5. Ambil data dropdown
         $userModel = $this->model('User_model');
         $staff = $userModel->getUsersByRole('staff');
         $admin = $userModel->getUsersByRole('admin');
-        $allKaryawan = array_merge($admin, $staff); // Gabungkan
+        $allKaryawan = array_merge($admin, $staff);
 
-        // 6. Siapkan data untuk view
+        // 6. Kirim ke View
         $data = [
             'judul' => 'Rekap Absensi',
             'absensi' => $paginatedAbsensi,
@@ -1656,7 +1822,6 @@ public function dashboard() {
             'allKaryawan' => $allKaryawan
         ];
         
-        // 7. Panggil view baru
         $this->view('admin/rekap_absensi', $data);
     }
     /**
@@ -1740,11 +1905,11 @@ public function dashboard() {
         
         // Path ke mysqldump (sesuaikan jika XAMPP Anda di lokasi berbeda)
         // KITA HARUS MENEMUKANNYA DULU
-        $mysqldumpPath = '"C:\xampp\mysql\bin\mysqldump.exe"'; // Path umum di Windows
+        $mysqldumpPath = '"D:\xampp\mysql\bin\mysqldump.exe"';
         
         // (Jika di Linux/macOS, path-nya mungkin hanya "mysqldump")
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            $mysqldumpPath = '"C:\xampp\mysql\bin\mysqldump.exe"';
+            $mysqldumpPath = '"D:\xampp\mysql\bin\mysqldump.exe"';
         } else {
             $mysqldumpPath = 'mysqldump'; // Asumsi sudah ada di PATH
         }
@@ -1843,4 +2008,143 @@ public function processCheckOut() {
     header('Location: ' . BASE_URL . 'admin/dashboard');
     exit;
 }
+/**
+     * [AJAX] Memproses Hapus Masal (Bulk Delete)
+     */
+    public function deleteBulkUsers() {
+        // 1. Pastikan Request POST
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            exit;
+        }
+
+        // 2. Ambil data JSON yang dikirim JS
+        $input = json_decode(file_get_contents('php://input'), true);
+        $ids = $input['ids'] ?? [];
+
+        if (empty($ids)) {
+            echo json_encode(['success' => false, 'message' => 'Tidak ada data yang dipilih.']);
+            exit;
+        }
+
+        // 3. PROTEKSI: Jangan biarkan Admin menghapus dirinya sendiri
+        if (in_array($_SESSION['user_id'], $ids)) {
+            // Hapus ID admin yang sedang login dari daftar hapus
+            $ids = array_diff($ids, [$_SESSION['user_id']]);
+            
+            if (empty($ids)) {
+                 echo json_encode(['success' => false, 'message' => 'Anda tidak bisa menghapus akun sendiri!']);
+                 exit;
+            }
+        }
+
+        // 4. Panggil Model
+        $userModel = $this->model('User_model');
+        if ($userModel->deleteBulkUsers($ids)) {
+            echo json_encode(['success' => true, 'message' => count($ids) . ' pengguna berhasil dihapus.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Gagal menghapus data.']);
+        }
+        exit;
+    }
+    /**
+     * [AJAX] Proses Update Absensi
+     */
+    public function updateAbsensi() {
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $id = $_POST['absen_id'];
+            $masuk = $_POST['waktu_masuk'];
+            $pulang = $_POST['waktu_pulang']; // Bisa string kosong
+
+            $absensiModel = $this->model('Absensi_model');
+            
+            if ($absensiModel->updateAbsensi($id, $masuk, $pulang)) {
+                echo json_encode(['success' => true, 'message' => 'Data absensi berhasil diperbarui.']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Gagal memperbarui database.']);
+            }
+        }
+    }
+    
+    /*
+    |--------------------------------------------------------------------------
+    | METODE BARU: PUSAT KONFIGURASI MASTER DATA (TABULASI)
+    |--------------------------------------------------------------------------
+    */
+    public function masterDataConfig() {
+        // Ambil semua data dari masing-masing model
+        // Kita menggunakan method 'getAll...' yang sudah tersedia di masing-masing model
+        $data = [
+            'judul'     => 'Konfigurasi Data Master',
+            'suppliers' => $this->model('Supplier_model')->getAllSuppliers(),
+            'lokasi'    => $this->model('Lokasi_model')->getAllLokasi(),
+            'kategori'  => $this->model('Kategori_model')->getAllKategori(),
+            'merek'     => $this->model('Merek_model')->getAllMerek(),
+            'satuan'    => $this->model('Satuan_model')->getAllSatuan(),
+            'status'    => $this->model('Status_model')->getAllStatus()
+        ];
+        
+        // Panggil view baru (yang akan kita buat di langkah B)
+        $this->view('admin/master_data_config', $data);
+    }
+    /* |--------------------------------------------------------------------------
+    | LOGIKA HAPUS MASAL (BULK DELETE) - UNIVERSAL
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Helper privat untuk memproses hapus masal agar kodenya tidak berulang
+     */
+    private function processBulkDelete($modelName, $methodName) {
+        // Pastikan request adalah POST
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            exit;
+        }
+        
+        // Ambil data JSON
+        $input = json_decode(file_get_contents('php://input'), true);
+        $ids = $input['ids'] ?? [];
+
+        if (empty($ids)) {
+            echo json_encode(['success' => false, 'message' => 'Tidak ada data yang dipilih.']);
+            exit;
+        }
+
+        // Panggil Model
+        $model = $this->model($modelName);
+        
+        try {
+            if ($model->$methodName($ids)) {
+                echo json_encode(['success' => true, 'message' => count($ids) . ' data berhasil dihapus.']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Gagal menghapus data dari database.']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // --- Endpoint untuk masing-masing modul ---
+
+    public function deleteBulkBarang() {
+        $this->processBulkDelete('Product_model', 'deleteBulkProducts');
+    }
+    public function deleteBulkKategori() {
+        $this->processBulkDelete('Kategori_model', 'deleteBulkKategori');
+    }
+    public function deleteBulkMerek() {
+        $this->processBulkDelete('Merek_model', 'deleteBulkMerek');
+    }
+    public function deleteBulkSatuan() {
+        $this->processBulkDelete('Satuan_model', 'deleteBulkSatuan');
+    }
+    public function deleteBulkStatus() {
+        $this->processBulkDelete('Status_model', 'deleteBulkStatus');
+    }
+    public function deleteBulkLokasi() {
+        $this->processBulkDelete('Lokasi_model', 'deleteBulkLokasi');
+    }
+    public function deleteBulkSupplier() {
+        $this->processBulkDelete('Supplier_model', 'deleteBulkSupplier');
+    }
 }

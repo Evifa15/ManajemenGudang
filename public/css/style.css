@@ -1,19 +1,26 @@
-/* Reset Dasar */
+/* --- PENGATURAN DASAR --- */
 body, h1, h2, h3, p, ul, li, a {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
     font-family: Arial, sans-serif;
 }
-body { background: #f4f7f6; }
-
-/* --- Layout Utama --- */
-.app-container {
-    display: flex;
-    flex-wrap: wrap; /* Untuk header */
-    min-height: 100vh;
+html, body {
+    height: 100%;       
+    overflow: hidden !important;   
+    margin: 0;
+    padding: 0;
+    background: #f4f7f6;
 }
 
+/* --- LAYOUT UTAMA --- */
+.app-container {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    height: 100vh;      
+    overflow: hidden;   
+}
 .app-header {
     width: 100%;
     background: #333;
@@ -34,7 +41,6 @@ body { background: #f4f7f6; }
     border-radius: 4px;
     font-size: 0.9em;
 }
-
 .app-sidebar {
     width: 220px;
     background: #ffffff;
@@ -44,11 +50,40 @@ body { background: #f4f7f6; }
     overflow-y: auto;
 }
 .app-content {
-    flex: 1; /* Mengisi sisa ruang */
+    flex: 1; 
     padding: 30px;
+    padding-bottom: 500px;
     height: calc(100vh - 60px);
-    overflow-y: auto; /* Agar bisa di-scroll jika konten panjang */
+    overflow-y: auto; 
 }
+
+/* --- MENU LOGIN / AUTHENTIFIKASI --- */
+.alert { 
+    padding: 15px; 
+    border-radius: 8px; 
+    margin-bottom: 20px; 
+    text-align: center; 
+    font-size: 0.95em; 
+    animation: fadeIn 0.5s; /* Animasi muncul */
+}
+.alert-danger { 
+    background-color: #ffebee; 
+    color: #c62828; 
+    border: 1px solid #ef9a9a; 
+}
+.alert-warning { 
+    background-color: #fff3e0; 
+    color: #e65100; 
+    border: 1px solid #ffcc80; 
+}
+
+
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 
 /* --- Menu Sidebar --- */
 .app-sidebar ul { list-style: none; }
@@ -78,6 +113,7 @@ body { background: #f4f7f6; }
     font-size: 0.95em;
 }
 .app-sidebar ul.submenu a:hover { background: #e2e6ea; }
+
 
 /* --- Konten Dashboard --- */
 .dashboard-widgets {
@@ -131,7 +167,6 @@ body { background: #f4f7f6; }
 .error-message { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 10px; border-radius: 4px; text-align: center; }
 
 /* --- CSS untuk Halaman Konten (Manajemen Pengguna) --- */
-
 .app-content .content-header {
     display: flex;
     justify-content: space-between; /* Membuat h1 dan tombol terpisah */
@@ -167,12 +202,10 @@ body { background: #f4f7f6; }
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     overflow: hidden; /* Agar radius di sudut tabel terlihat */
 }
-
 .content-table table {
     width: 100%;
     border-collapse: collapse; /* Menghilangkan spasi antar border */
 }
-
 .content-table th,
 .content-table td {
     padding: 15px;
@@ -460,4 +493,46 @@ ul.pagination li.disabled a {
 }
 .tab-pane.active {
     display: block; /* Tampilkan yang aktif */
+}
+/* --- BONUS: Merapikan Tampilan Scrollbar (Webkit Chrome/Edge/Safari) --- */
+
+/* Lebar scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+/* Track (Jalur) */
+::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+}
+
+/* Handle (Batang geser) */
+::-webkit-scrollbar-thumb {
+    background: #ccc; 
+    border-radius: 4px;
+}
+
+/* Handle saat di-hover */
+::-webkit-scrollbar-thumb:hover {
+    background: #999; 
+}
+/* --- CSS Tambahan untuk Tombol Header --- */
+.header-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+/* Warna tombol sukses (Hijau) untuk Import */
+.btn-success {
+    background-color: #28a745;
+    color: white;
+    border: none;
+}
+.btn-success:hover {
+    background-color: #218838;
+}
+/* Saat mode printing (PDF), sembunyikan kolom aksi */
+.printing-mode .no-print {
+    display: none !important;
 }

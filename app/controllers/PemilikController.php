@@ -23,11 +23,6 @@ class PemilikController extends Controller {
             exit;
         }
         
-        // 3. GATEKEEPER: Pastikan status 'aktif' (sudah ganti password)
-        if (isset($_SESSION['status_login']) && $_SESSION['status_login'] == 'baru') {
-             header('Location: ' . BASE_URL . 'auth/forceChangePassword');
-            exit;
-        }
     }
 
     /**

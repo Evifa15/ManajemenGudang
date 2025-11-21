@@ -4,30 +4,14 @@
             <a href="<?php echo BASE_URL; ?>admin/dashboard">Dashboard</a>
         </li>
         
-        <li><a href="#">Menu Master Data</a>
-            <ul class="submenu">
-                <li class="<?php echo (str_starts_with($data['judul'], 'Manajemen Barang') || str_starts_with($data['judul'], 'Tambah Barang')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/barang">Manajemen Barang</a>
-                </li>
-                <li class="<?php echo ($data['judul'] == 'Manajemen Supplier' || $data['judul'] == 'Tambah Supplier' || $data['judul'] == 'Edit Supplier') ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/suppliers">Manajemen Supplier</a>
-                </li>
-                <li class="<?php echo ($data['judul'] == 'Manajemen Lokasi' || $data['judul'] == 'Tambah Lokasi' || $data['judul'] == 'Edit Lokasi') ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/lokasi">Manajemen Lokasi</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Manajemen Kategori') || str_starts_with($data['judul'], 'Tambah Kategori') || str_starts_with($data['judul'], 'Edit Kategori')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/kategori">Manajemen Kategori</a>
-                </li> 
-                <li class="<?php echo (str_starts_with($data['judul'], 'Manajemen Merek') || str_starts_with($data['judul'], 'Tambah Merek') || str_starts_with($data['judul'], 'Edit Merek')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/merek">Manajemen Merek</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Manajemen Satuan') || str_starts_with($data['judul'], 'Tambah Satuan') || str_starts_with($data['judul'], 'Edit Satuan')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/satuan">Manajemen Satuan</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Manajemen Status') || str_starts_with($data['judul'], 'Tambah Status') || str_starts_with($data['judul'], 'Edit Status')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/status">Manajemen Status</a>
-                </li>
-            </ul>
+        <li class="<?php echo (
+                str_starts_with($data['judul'], 'Manajemen Barang') || 
+                str_starts_with($data['judul'], 'Tambah Barang') || 
+                str_starts_with($data['judul'], 'Edit Barang') ||
+                str_starts_with($data['judul'], 'Konfigurasi Data') // Supaya tetap aktif saat di halaman Tabulasi
+            ) ? 'active' : ''; ?>">
+            
+            <a href="<?php echo BASE_URL; ?>admin/barang">Master Data Barang</a>
         </li>
 
         <li><a href="#">Menu Transaksi</a>
@@ -52,7 +36,7 @@
                 <li class="<?php echo (str_starts_with($data['judul'], 'Stock Opname')) ? 'active' : ''; ?>">
                     <a href="<?php echo BASE_URL; ?>admin/stockOpname">Stock Opname</a>
                 </li>
-                </ul>
+            </ul>
         </li>
 
         <li><a href="#">Administrasi Sistem</a>
@@ -87,6 +71,7 @@
         </li>
         
     </ul>
+    
     <div class="sidebar-profile-link">
         <a href="<?php echo BASE_URL; ?>profile/index" 
            class="<?php echo (str_starts_with($data['judul'], 'Profil Saya')) ? 'active' : ''; ?>">

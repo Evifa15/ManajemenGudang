@@ -11,6 +11,9 @@
 <main class="app-content">
     
     <div class="content-header">
+        <a href="<?php echo BASE_URL; ?>admin/users" class="btn" style="background-color: #6c757d; color: white; text-decoration: none;">
+                &larr; Kembali
+            </a>
         <h1>Tambah Pengguna Baru</h1>
     </div>
 
@@ -42,14 +45,6 @@
                     <option value="staff">Staff Gudang</option>
                     <option value="pemilik">Pemilik</option>
                     <option value="peminjam">Peminjam</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="status_login">Status Login Awal</label>
-                <select id="status_login" name="status_login" required>
-                    <option value="aktif">Aktif (Bisa langsung login)</option>
-                    <option value="baru">Baru (Harus ganti password)</option>
                 </select>
             </div>
 

@@ -9,7 +9,9 @@
 <main class="app-content">
     
     <div class="content-header">
-        <h1><?php echo $isEditMode ? 'Edit Lokasi' : 'Tambah Lokasi Baru'; ?></h1>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <h1><?php echo $isEditMode ? 'Edit Lokasi' : 'Tambah Lokasi Baru'; ?></h1>
+        </div>
     </div>
 
     <div class="form-container">
@@ -48,7 +50,7 @@
             
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary"><?php echo $isEditMode ? 'Update' : 'Simpan'; ?> Lokasi</button>
-                <a href="<?php echo BASE_URL; ?>admin/lokasi" class="btn btn-danger">Batal</a>
+                <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-lokasi" class="btn btn-danger">Batal</a>
             </div>
 
         </form>
