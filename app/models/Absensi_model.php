@@ -9,26 +9,27 @@ class Absensi_model extends Model {
     }
 
     /**
-     * Menghitung total data absensi (dengan filter & search)
+     * Menghitung total data absensi (dengan filter Status & Search)
      */
     public function getTotalAbsensiCount($filters = []) {
         $sql = "SELECT COUNT(a.absen_id) as total 
                 FROM " . $this->table . " a
                 LEFT JOIN users u ON a.user_id = u.user_id
                 WHERE 1=1";
-        
         $params = [];
-
-        // 🔥 PASTIKAN BAGIAN INI ADA 🔥
         if (!empty($filters['search'])) {
             $sql .= " AND (u.nama_lengkap LIKE :search OR u.email LIKE :search)";
             $params[':search'] = '%' . $filters['search'] . '%';
         }
-        // -----------------------------
-
-        if (!empty($filters['user_id'])) {
-            $sql .= " AND a.user_id = :user_id";
-            $params[':user_id'] = $filters['user_id'];
+        if (!empty($filters['status'])) {
+            if ($filters['status'] == 'Masih Bekerja') {
+                $sql .= " AND a.status = 'Hadir' AND a.waktu_pulang IS NULL";
+            } elseif ($filters['status'] == 'Hadir') {
+                $sql .= " AND a.status = 'Hadir' AND a.waktu_pulang IS NOT NULL";
+            } else {
+                $sql .= " AND a.status = :status";
+                $params[':status'] = $filters['status'];
+            }
         }
         if (!empty($filters['month'])) {
             $sql .= " AND MONTH(a.tanggal) = :month";
@@ -38,7 +39,6 @@ class Absensi_model extends Model {
             $sql .= " AND YEAR(a.tanggal) = :year";
             $params[':year'] = $filters['year'];
         }
-
         $this->query($sql);
         foreach ($params as $key => $value) {
             $this->bind($key, $value);
@@ -46,20 +46,26 @@ class Absensi_model extends Model {
         return $this->single()['total'];
     }
 
-    /* --- MENGAMBIL DATA DENGAN PAGINASI (SEARCH DAN FILTER) --- */
+    /* --- MENGAMBIL DATA DENGAN PAGINASI (SEARCH DAN FILTER STATUS) --- */
     public function getAbsensiPaginated($limit, $offset, $filters = []) {
         $sql = "SELECT a.absen_id, a.tanggal, a.waktu_masuk, a.waktu_pulang, a.status, a.bukti_foto, u.nama_lengkap
             FROM " . $this->table . " a
             LEFT JOIN users u ON a.user_id = u.user_id
-            WHERE 1=1";
-        $params = [];
+            WHERE 1=1";       
+        $params = [];       
         if (!empty($filters['search'])) {
             $sql .= " AND (u.nama_lengkap LIKE :search OR u.email LIKE :search)";
             $params[':search'] = '%' . $filters['search'] . '%';
         }
-        if (!empty($filters['user_id'])) {
-            $sql .= " AND a.user_id = :user_id";
-            $params[':user_id'] = $filters['user_id'];
+        if (!empty($filters['status'])) {
+            if ($filters['status'] == 'Masih Bekerja') {
+                $sql .= " AND a.status = 'Hadir' AND a.waktu_pulang IS NULL";
+            } elseif ($filters['status'] == 'Hadir') {
+                $sql .= " AND a.status = 'Hadir' AND a.waktu_pulang IS NOT NULL";
+            } else {
+                $sql .= " AND a.status = :status";
+                $params[':status'] = $filters['status'];
+            }
         }
         if (!empty($filters['month'])) {
             $sql .= " AND MONTH(a.tanggal) = :month";
@@ -75,7 +81,7 @@ class Absensi_model extends Model {
         $this->query($sql);
         foreach ($params as $key => &$value) {
             $type = ($key == ':limit' || $key == ':offset') ? PDO::PARAM_INT : PDO::PARAM_STR;
-            if (in_array($key, [':user_id', ':month', ':year'])) {
+            if (in_array($key, [':month', ':year'])) {
                 $type = PDO::PARAM_INT;
             }
             $this->bind($key, $value, $type);
@@ -152,19 +158,37 @@ class Absensi_model extends Model {
     }
 
     /**
-     * [ADMIN] Update manual data absensi (Edit Jam)
+     * [ADMIN] Update manual data absensi (Status, Jam, Keterangan, Bukti)
+     * REVISI: Bisa menghapus bukti foto (Set NULL)
      */
-    public function updateAbsensi($id, $masuk, $pulang) {
-        // Jika pulang kosong, set NULL
-        $pulangVal = !empty($pulang) ? $pulang : null;
-
-        $this->query("UPDATE " . $this->table . " 
-                      SET waktu_masuk = :masuk, waktu_pulang = :pulang 
-                      WHERE absen_id = :id");
+    public function updateAbsensi($data) {
+        // Query dasar
+        $sql = "UPDATE " . $this->table . " SET 
+                    status = :status,
+                    waktu_masuk = :masuk, 
+                    waktu_pulang = :pulang,
+                    keterangan = :keterangan";
         
-        $this->bind('masuk', $masuk);
-        $this->bind('pulang', $pulangVal);
-        $this->bind('id', $id);
+        // PERBAIKAN: Gunakan array_key_exists agar bisa mendeteksi request penghapusan (null)
+        if (array_key_exists('bukti_foto', $data)) {
+            $sql .= ", bukti_foto = :bukti";
+        }
+
+        $sql .= " WHERE absen_id = :id";
+        
+        $this->query($sql);
+
+        // Binding data wajib
+        $this->bind('status', $data['status']);
+        $this->bind('masuk', $data['waktu_masuk']);
+        $this->bind('pulang', $data['waktu_pulang']);
+        $this->bind('keterangan', $data['keterangan']);
+        $this->bind('id', $data['absen_id']);
+
+        // Binding data opsional (bukti)
+        if (array_key_exists('bukti_foto', $data)) {
+            $this->bind('bukti', $data['bukti_foto']);
+        }
         
         return $this->execute();
     }

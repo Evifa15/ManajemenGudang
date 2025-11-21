@@ -1739,64 +1739,58 @@ exit;
         // 6. Panggil view baru (yang akan kita buat)
         $this->view('admin/report_peminjaman', $data);
     }
+
     /**
      * Menampilkan Halaman Rekap Absensi (Admin View)
-     * UPDATE: Support AJAX Real-time Filter
+     * UPDATE: Support AJAX Real-time Filter (Search & Status)
      */
     public function rekapAbsensi($page = 1) {
-        // 1. Ambil filter
         $filters = [
             'search'  => $_GET['search'] ?? '',
-            'user_id' => $_GET['user_id'] ?? '',
-            'month'   => $_GET['month'] ?? date('m'), // Default bulan ini
-            'year'    => $_GET['year'] ?? date('Y')   // Default tahun ini
+            'status'  => $_GET['status'] ?? '', 
+            'month'   => $_GET['month'] ?? date('m'), 
+            'year'    => $_GET['year'] ?? date('Y')
         ];
-
-        // 2. Setup Paginasi (Default 10 baris)
         $limit = 10;
         $page = (int)$page;
         if ($page < 1) $page = 1;
-
-        // 3. Panggil Model
         $absensiModel = $this->model('Absensi_model');
-        
-        // 4. Hitung Data
         $totalAbsensi = $absensiModel->getTotalAbsensiCount($filters);
         $totalPages = ceil($totalAbsensi / $limit);
         $offset = ($page - 1) * $limit;
         $paginatedAbsensi = $absensiModel->getAbsensiPaginated($limit, $offset, $filters);
-
-        // 🔥 LOGIKA AJAX (BARU) 🔥
         if (isset($_GET['ajax'])) {
-            // Format ulang data untuk JSON
             $formattedData = [];
             foreach ($paginatedAbsensi as $absen) {
                 $totalJam = '-';
-                $status = 'Alpa';
-                
-                if ($absen['waktu_masuk']) {
-                    $status = 'Hadir';
-                    if ($absen['waktu_pulang']) {
-                        $checkin = new DateTime($absen['waktu_masuk']);
-                        $checkout = new DateTime($absen['waktu_pulang']);
-                        $interval = $checkin->diff($checkout);
-                        $totalJam = $interval->format('%h jam %i mnt');
-                    } else {
-                        $status = 'Masih Bekerja';
+                $status = 'Alpa';               
+                if ($absen['status'] != 'Hadir') {
+                    $status = $absen['status'];
+                } else {
+                    if ($absen['waktu_masuk']) {
+                        if ($absen['waktu_pulang']) {
+                            $status = 'Hadir';
+                            $checkin = new DateTime($absen['waktu_masuk']);
+                            $checkout = new DateTime($absen['waktu_pulang']);
+                            $interval = $checkin->diff($checkout);
+                            $totalJam = $interval->format('%h jam %i mnt');
+                        } else {
+                            $status = 'Masih Bekerja';
+                        }
                     }
                 }
 
                 $formattedData[] = [
-                    'absen_id'      => $absen['absen_id'], // Pastikan model ambil ID ini
+                    'absen_id'      => $absen['absen_id'],
                     'tanggal'       => date('d-m-Y', strtotime($absen['tanggal'])),
                     'nama_lengkap'  => htmlspecialchars($absen['nama_lengkap']),
                     'waktu_masuk'   => $absen['waktu_masuk'] ? date('H:i:s', strtotime($absen['waktu_masuk'])) : '-',
                     'waktu_pulang'  => $absen['waktu_pulang'] ? date('H:i:s', strtotime($absen['waktu_pulang'])) : '-',
                     'total_jam'     => $totalJam,
-                    'status'        => $status
+                    'status'        => $status,
+                    'bukti_foto'    => $absen['bukti_foto'] 
                 ];
             }
-
             header('Content-Type: application/json');
             echo json_encode([
                 'absensi' => $formattedData,
@@ -1805,25 +1799,16 @@ exit;
             ]);
             exit;
         }
-
-        // 5. Ambil data dropdown
-        $userModel = $this->model('User_model');
-        $staff = $userModel->getUsersByRole('staff');
-        $admin = $userModel->getUsersByRole('admin');
-        $allKaryawan = array_merge($admin, $staff);
-
-        // 6. Kirim ke View
         $data = [
             'judul' => 'Rekap Absensi',
             'absensi' => $paginatedAbsensi,
             'totalPages' => $totalPages,
             'currentPage' => $page,
-            'filters' => $filters,
-            'allKaryawan' => $allKaryawan
-        ];
-        
+            'filters' => $filters
+        ];      
         $this->view('admin/rekap_absensi', $data);
     }
+
     /**
      * Menampilkan Halaman Audit Trail (Admin View)
      * (Logika ini SAMA PERSIS dengan PemilikController)
@@ -2147,4 +2132,75 @@ public function processCheckOut() {
     public function deleteBulkSupplier() {
         $this->processBulkDelete('Supplier_model', 'deleteBulkSupplier');
     }
+
+
+    /**
+     * [AKSI] Memproses Edit Absensi Manual (Update Lengkap + File + Hapus File)
+     */
+    public function updateAbsensiManual() {
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            
+            $status = $_POST['status'];
+            $id = $_POST['absen_id'];
+            
+            // Data Dasar untuk Model
+            $data = [
+                'absen_id' => $id,
+                'status'   => $status
+            ];
+            
+            // Logika Data Berdasarkan Status
+            if ($status == 'Hadir') {
+                // JIKA HADIR:
+                $data['waktu_masuk'] = !empty($_POST['waktu_masuk']) ? $_POST['waktu_masuk'] : null;
+                $data['waktu_pulang'] = !empty($_POST['waktu_pulang']) ? $_POST['waktu_pulang'] : null;
+                $data['keterangan'] = null; // Hapus keterangan
+                
+                // 🔥 HAPUS BUKTI FOTO (Set NULL) 🔥
+                // Kita kirim kunci 'bukti_foto' dengan nilai null agar Model menghapusnya
+                $data['bukti_foto'] = null; 
+
+            } else {
+                // JIKA SAKIT/IZIN/ALPA:
+                $data['waktu_masuk'] = null; 
+                $data['waktu_pulang'] = null;
+                $data['keterangan'] = $_POST['keterangan'];
+
+                // Cek Upload File Baru
+                if (isset($_FILES['bukti_foto']) && $_FILES['bukti_foto']['error'] == UPLOAD_ERR_OK) {
+                    $file = $_FILES['bukti_foto'];
+                    $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                    $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+
+                    if (in_array($fileExt, $allowed)) {
+                        if ($file['size'] <= 2000000) { 
+                            $buktiNama = "admin_upd_" . $id . "_" . time() . "." . $fileExt;
+                            $destination = APPROOT . '/../public/uploads/bukti_absen/' . $buktiNama;
+                            
+                            if (move_uploaded_file($file['tmp_name'], $destination)) {
+                                // Jika upload sukses, masukkan ke data update
+                                $data['bukti_foto'] = $buktiNama;
+                            }
+                        } 
+                    }
+                }
+                // CATATAN: Jika tidak ada file baru diupload saat status Sakit/Izin,
+                // kita JANGAN kirim key 'bukti_foto' ke array $data.
+                // Agar bukti lama (jika ada) tidak terhapus/tertimpa null.
+            }
+
+            $absensiModel = $this->model('Absensi_model');
+            
+            if ($absensiModel->updateAbsensi($data)) {
+                $_SESSION['flash_message'] = ['text' => 'Data absensi berhasil diperbarui.', 'type' => 'success'];
+            } else {
+                $_SESSION['flash_message'] = ['text' => 'Gagal memperbarui data.', 'type' => 'error'];
+            }
+            
+            header('Location: ' . BASE_URL . 'admin/rekapAbsensi');
+            exit;
+        }
+    }
+
+
 }

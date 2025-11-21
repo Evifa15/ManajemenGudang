@@ -3,6 +3,17 @@
     require_once APPROOT . '/views/templates/sidebar_admin.php';
 ?>
 <main class="app-content">
+    
+    <?php
+        // --- BLOK NOTIFIKASI (INI YANG KITA TAMBAHKAN) ---
+        // Bertugas menangkap pesan dari Controller dan menampilkannya
+        if(isset($_SESSION['flash_message'])) {
+            $flash = $_SESSION['flash_message'];
+            echo '<div class="flash-message ' . $flash['type'] . '">' . $flash['text'] . '</div>';
+            unset($_SESSION['flash_message']); // Hapus agar tidak muncul lagi saat refresh
+        }
+    ?>
+
     <div class="content-header">
         <h1>Rekap Absensi Karyawan</h1>
         <div>
@@ -11,24 +22,27 @@
             </button>
         </div>
     </div>
+
     <div class="search-container filter-row">       
         <div class="filter-group flex-grow">
-            <label for="searchAbsensi">Cari</label>
+            <label for="searchAbsensi">Cari Nama Karyawan:</label>
             <input type="text" id="searchAbsensi" class="search-input" 
-                   placeholder="Ketik nama karyawan..." 
+                   placeholder="Ketik nama..." 
                    data-base-url="<?php echo BASE_URL; ?>"> 
         </div>
-        <div class="filter-group flex-grow">
-            <label for="filterUser">Pilih Karyawan:</label>
-            <select id="filterUser" class="filter-select full-width">
-                <option value="">-- Semua Karyawan --</option>
-                <?php foreach($data['allKaryawan'] as $k): ?>
-                    <option value="<?php echo $k['user_id']; ?>" <?php if($data['filters']['user_id'] == $k['user_id']) echo 'selected'; ?>>
-                        <?php echo htmlspecialchars($k['nama_lengkap']); ?>
-                    </option>
-                <?php endforeach; ?>
+
+        <div class="filter-group">
+            <label for="filterStatus">Status Kehadiran:</label>
+            <select id="filterStatus" class="filter-select full-width">
+                <option value="">-- Semua Status --</option>
+                <option value="Hadir">Hadir (Selesai)</option>
+                <option value="Masih Bekerja">Masih Bekerja (Belum Pulang)</option>
+                <option value="Sakit">Sakit</option>
+                <option value="Izin">Izin</option>
+                <option value="Alpa">Alpa</option>
             </select>
         </div>
+
         <div class="filter-group date-filters">
             <div class="date-select-wrapper">
                 <label for="filterMonth">Bulan:</label>
@@ -54,6 +68,7 @@
             </div>
         </div>
     </div>
+    
     <div id="areaPrintAbsensi" class="content-table">
         <div class="pdf-header">
             <h2>Laporan Absensi Karyawan</h2>
@@ -120,7 +135,7 @@
                     </td>
                     <td class="no-print">
                         <button class="btn btn-warning btn-sm" 
-                                onclick="editAbsenPopup('<?php echo $absen['absen_id']; ?>', '<?php echo htmlspecialchars($absen['nama_lengkap']); ?>', '<?php echo $absen['waktu_masuk']; ?>', '<?php echo $absen['waktu_pulang']; ?>')">
+                                onclick="editAbsenPopup('<?php echo $absen['absen_id']; ?>', '<?php echo htmlspecialchars($absen['nama_lengkap']); ?>', '<?php echo $absen['waktu_masuk']; ?>', '<?php echo $absen['waktu_pulang']; ?>', '<?php echo $absen['status']; ?>', '<?php echo htmlspecialchars($absen['keterangan'] ?? '', ENT_QUOTES); ?>')">
                             Edit
                         </button>
                     </td>
