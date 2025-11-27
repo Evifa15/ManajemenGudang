@@ -9,31 +9,30 @@ class Loan_model extends Model {
     }
 
     /**
-     * Menghitung total riwayat peminjaman (Admin View)
+     * [UPDATED] Menghitung total riwayat peminjaman (DENGAN DATE FILTER)
      */
-    public function getTotalRiwayatPeminjamanCount($search, $status) {
+    public function getTotalRiwayatPeminjamanCount($search, $status, $startDate = null, $endDate = null) {
         $sql = "SELECT COUNT(p.peminjaman_id) as total
                 FROM " . $this->table . " p
                 LEFT JOIN products pr ON p.product_id = pr.product_id
                 LEFT JOIN users u_peminjam ON p.peminjam_user_id = u_peminjam.user_id
-                ";
+                WHERE 1=1"; // Dummy clause agar bisa pakai AND
         
         $params = [];
-        $whereClauses = [];
 
-        // Filter Search (Nama Peminjam atau Nama Barang)
         if (!empty($search)) {
-            $whereClauses[] = "(pr.nama_barang LIKE :search OR u_peminjam.nama_lengkap LIKE :search)";
+            $sql .= " AND (pr.nama_barang LIKE :search OR u_peminjam.nama_lengkap LIKE :search)";
             $params[':search'] = '%' . $search . '%';
         }
-        // Filter Status
         if (!empty($status)) {
-            $whereClauses[] = "p.status_pinjam = :status";
+            $sql .= " AND p.status_pinjam = :status";
             $params[':status'] = $status;
         }
-
-        if (!empty($whereClauses)) {
-            $sql .= " WHERE " . implode(" AND ", $whereClauses);
+        // Filter Tanggal (Berdasarkan Tgl Pengajuan)
+        if (!empty($startDate) && !empty($endDate)) {
+            $sql .= " AND DATE(p.tgl_pengajuan) BETWEEN :start AND :end";
+            $params[':start'] = $startDate;
+            $params[':end'] = $endDate;
         }
 
         $this->query($sql);
@@ -44,9 +43,9 @@ class Loan_model extends Model {
     }
 
     /**
-     * Mengambil data riwayat peminjaman dengan paginasi (Admin View)
+     * [UPDATED] Mengambil data riwayat peminjaman (DENGAN DATE FILTER)
      */
-    public function getRiwayatPeminjamanPaginated($limit, $offset, $search, $status) {
+    public function getRiwayatPeminjamanPaginated($limit, $offset, $search, $status, $startDate = null, $endDate = null) {
         $sql = "SELECT 
                     p.tgl_pengajuan, p.tgl_rencana_pinjam, p.tgl_rencana_kembali,
                     p.status_pinjam,
@@ -58,24 +57,23 @@ class Loan_model extends Model {
                 LEFT JOIN products pr ON p.product_id = pr.product_id
                 LEFT JOIN users u_peminjam ON p.peminjam_user_id = u_peminjam.user_id
                 LEFT JOIN users u_staff ON p.staff_user_id = u_staff.user_id
-                ";
+                WHERE 1=1";
         
         $params = [];
-        $whereClauses = [];
 
-        // Filter Search (Nama Peminjam atau Nama Barang)
         if (!empty($search)) {
-            $whereClauses[] = "(pr.nama_barang LIKE :search OR u_peminjam.nama_lengkap LIKE :search)";
+            $sql .= " AND (pr.nama_barang LIKE :search OR u_peminjam.nama_lengkap LIKE :search)";
             $params[':search'] = '%' . $search . '%';
         }
-        // Filter Status
         if (!empty($status)) {
-            $whereClauses[] = "p.status_pinjam = :status";
+            $sql .= " AND p.status_pinjam = :status";
             $params[':status'] = $status;
         }
-
-        if (!empty($whereClauses)) {
-            $sql .= " WHERE " . implode(" AND ", $whereClauses);
+        // Filter Tanggal
+        if (!empty($startDate) && !empty($endDate)) {
+            $sql .= " AND DATE(p.tgl_pengajuan) BETWEEN :start AND :end";
+            $params[':start'] = $startDate;
+            $params[':end'] = $endDate;
         }
 
         $sql .= " ORDER BY p.tgl_pengajuan DESC LIMIT :limit OFFSET :offset";
@@ -90,6 +88,7 @@ class Loan_model extends Model {
         
         return $this->resultSet();
     }
+    
     /**
      * Mengambil data peminjaman (untuk workflow Staff) berdasarkan ARRAY status
      */

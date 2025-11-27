@@ -410,25 +410,110 @@ class StaffController extends Controller {
     |--------------------------------------------------------------------------
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | METODE UNTUK OPERASI STOCK OPNAME (STAFF INPUT) - V2 (DELEGASI)
+    |--------------------------------------------------------------------------
+    */
+
     /**
-     * Menampilkan halaman form input stock opname (physical count)
+     * Menampilkan halaman Stock Opname (Mode Lobi atau Mode Kerja)
+     * URL: /staff/inputOpname/[task_id]
      */
-    public function inputOpname() {
-        
-        // ⬇️ --- PERBAIKAN LOGIKA INI --- ⬇️
+    public function inputOpname($taskId = null) {
         $opnameModel = $this->model('Opname_model');
         $activePeriod = $opnameModel->getActivePeriod();
-        $isOpnameActive = $activePeriod ? true : false; 
-        // ⬆️ --- AKHIR PERBAIKAN --- ⬆️
-
+        
         $data = [
             'judul' => 'Input Stock Opname',
-            'isOpnameActive' => $isOpnameActive,
-            'activePeriodId' => $activePeriod['period_id'] ?? null, // Kirim ID periode ke view
-            'products' => $this->model('Product_model')->getAllProductsList()
+            'isOpnameActive' => false,
+            'viewState' => 'idle', // idle, lobby, workspace
+            'activePeriod' => null,
+            'myTasks' => [],       // List tugas yang diambil (untuk Lobi)
+            'availableTasks' => [], // List tugas nganggur (untuk Lobi)
+            'currentTask' => null,  // Tugas yang sedang dikerjakan (untuk Workspace)
+            'products' => [],       // Daftar produk di kategori terpilih
+            'myEntries' => []       // [BARU] Riwayat inputan staff untuk checklist
         ];
+
+        if ($activePeriod) {
+            $data['isOpnameActive'] = true;
+            $data['activePeriod'] = $activePeriod;
+
+            // Jika ada Task ID di URL -> Coba masuk WORKSPACE
+            if ($taskId) {
+                $task = $opnameModel->getTaskById($taskId);
+                
+                // Validasi: Tugas harus ada, milik user ini, dan statusnya In Progress
+                if ($task && $task['assigned_to_user_id'] == $_SESSION['user_id'] && $task['status_task'] == 'In Progress') {
+                    
+                    $data['viewState'] = 'workspace';
+                    $data['currentTask'] = $task;
+                    
+                    // Ambil produk kategori ini
+                    $productModel = $this->model('Product_model');
+                    $data['products'] = $productModel->getAllProductsList($task['kategori_id']);
+                    
+                    // [BARU] Ambil Riwayat Inputan Staff untuk Kategori ini (Checklist)
+                    $data['myEntries'] = $opnameModel->getMyEntriesByCategory(
+                        $activePeriod['period_id'], 
+                        $_SESSION['user_id'], 
+                        $task['kategori_id']
+                    );
+                
+                } else {
+                    // Jika tidak valid (misal akses tugas orang lain), kembalikan ke lobi
+                    $_SESSION['flash_message'] = ['text' => 'Tugas tidak valid atau bukan milik Anda.', 'type' => 'error'];
+                    header('Location: ' . BASE_URL . 'staff/inputOpname');
+                    exit;
+                }
+
+            } else {
+                // Jika tidak ada Task ID -> Masuk LOBI
+                $data['viewState'] = 'lobby';
+                
+                // 1. Ambil tugas yang SAYA ambil
+                $data['myTasks'] = $opnameModel->getMyActiveTasks($activePeriod['period_id'], $_SESSION['user_id']);
+                
+                // 2. Ambil semua tugas untuk daftar "Tersedia"
+                $data['availableTasks'] = $opnameModel->getTaskProgress($activePeriod['period_id']);
+            }
+        }
         
         $this->view('staff/input_stock_opname', $data);
+    }
+
+    /**
+     * [AKSI] Mengambil Tugas (Claim)
+     */
+    public function claimTask($taskId) {
+        $opnameModel = $this->model('Opname_model');
+        
+        if ($opnameModel->claimTask($taskId, $_SESSION['user_id'])) {
+            $_SESSION['flash_message'] = ['text' => 'Tugas berhasil diambil. Selamat bekerja!', 'type' => 'success'];
+        } else {
+            $_SESSION['flash_message'] = ['text' => 'Gagal mengambil tugas. Mungkin sudah diambil orang lain.', 'type' => 'error'];
+        }
+        
+        header('Location: ' . BASE_URL . 'staff/inputOpname');
+        exit;
+    }
+
+    /**
+     * [AKSI] Menyelesaikan Tugas (Submit)
+     */
+    public function submitTask($taskId) {
+        $opnameModel = $this->model('Opname_model');
+        
+        // Logika: submitTask($taskId, $userId)
+        if ($opnameModel->submitTask($taskId, $_SESSION['user_id'])) {
+            $_SESSION['flash_message'] = ['text' => 'Tugas selesai dan disubmit. Terima kasih!', 'type' => 'success'];
+        } else {
+            $_SESSION['flash_message'] = ['text' => 'Gagal submit tugas.', 'type' => 'error'];
+        }
+        
+        header('Location: ' . BASE_URL . 'staff/inputOpname');
+        exit;
     }
 
     /**
@@ -447,7 +532,7 @@ class StaffController extends Controller {
             'lot_number'   => $_POST['lot_number'] ?? null,
             'catatan'      => $_POST['catatan'],
             'user_id'      => $_SESSION['user_id'],
-            'period_id'    => $_POST['period_id'] // ⬇️ --- TAMBAHKAN INI --- ⬇️
+            'period_id'    => $_POST['period_id']
         ];
         
         // 2. Kirim ke Model
@@ -463,6 +548,7 @@ class StaffController extends Controller {
         header('Location: ' . BASE_URL . 'staff/inputOpname');
         exit;
     }
+
     /*
     |--------------------------------------------------------------------------
     | METODE UNTUK MENU LIHAT DATA (READ-ONLY)

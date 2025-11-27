@@ -30,7 +30,7 @@ class ProfileController extends Controller {
     }
 
     /**
-     * Memproses update Info Pribadi & Kontak
+     * Memproses update Info Pribadi & Kontak (DENGAN FITUR UPLOAD FOTO)
      */
     public function processProfileInfo() {
         if ($_SERVER['REQUEST_METHOD'] != 'POST') {
@@ -38,11 +38,66 @@ class ProfileController extends Controller {
             exit;
         }
 
-        // Kumpulkan data (termasuk foto, tapi logic upload foto belum dibuat)
+        // 1. Ambil Data Profil Lama (Untuk mendapatkan nama foto saat ini)
+        $userModel = $this->model('User_model');
+        $currentProfile = $userModel->getJoinedUserProfile($_SESSION['user_id']);
+        
+        // Default: Gunakan foto lama (jika user tidak upload foto baru)
+        $fotoNama = $currentProfile['foto_profil']; 
+
+        // 2. Logika Upload Foto Baru
+        if (isset($_FILES['foto_profil']) && $_FILES['foto_profil']['error'] == UPLOAD_ERR_OK) {
+            $file = $_FILES['foto_profil'];
+            $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $allowed = ['jpg', 'jpeg', 'png', 'gif'];
+
+            // Validasi Ekstensi
+            if (in_array($fileExt, $allowed)) {
+                // Validasi Ukuran (Max 2MB)
+                if ($file['size'] <= 2000000) { 
+                    // Buat nama file unik: profil_[USER_ID]_[WAKTU].[EXT]
+                    $newFileName = "profil_" . $_SESSION['user_id'] . "_" . time() . "." . $fileExt;
+                    
+                    // Tentukan lokasi simpan (public/uploads/profil/)
+                    $destination = APPROOT . '/../public/uploads/profil/' . $newFileName;
+                    
+                    // Buat folder jika belum ada (Penting!)
+                    if (!file_exists(dirname($destination))) {
+                        mkdir(dirname($destination), 0777, true);
+                    }
+
+                    // Pindahkan file
+                    if (move_uploaded_file($file['tmp_name'], $destination)) {
+                        // Hapus foto lama dari folder (untuk hemat penyimpanan)
+                        // Cek apakah foto lama ada dan bukan null
+                        if ($fotoNama && file_exists(APPROOT . '/../public/uploads/profil/' . $fotoNama)) {
+                            unlink(APPROOT . '/../public/uploads/profil/' . $fotoNama);
+                        }
+                        
+                        // Update variabel untuk disimpan ke DB
+                        $fotoNama = $newFileName; 
+                    } else {
+                        $_SESSION['flash_message'] = ['text' => 'Gagal memindahkan file foto.', 'type' => 'error'];
+                        header('Location: ' . BASE_URL . 'profile/index');
+                        exit;
+                    }
+                } else {
+                    $_SESSION['flash_message'] = ['text' => 'Ukuran foto terlalu besar (Max 2MB).', 'type' => 'error'];
+                    header('Location: ' . BASE_URL . 'profile/index');
+                    exit;
+                }
+            } else {
+                $_SESSION['flash_message'] = ['text' => 'Format file tidak didukung (Gunakan JPG/PNG).', 'type' => 'error'];
+                header('Location: ' . BASE_URL . 'profile/index');
+                exit;
+            }
+        }
+
+        // 3. Kumpulkan Data untuk Update Database
         $data = [
             'user_id' => $_SESSION['user_id'],
             'nama_lengkap' => $_POST['nama_lengkap'],
-            'foto_profil' => null, // (Kita akan tambahkan logic upload foto nanti)
+            'foto_profil' => $fotoNama, // <--- INI KUNCINYA (File baru atau lama)
             'tempat_lahir' => $_POST['tempat_lahir'],
             'tanggal_lahir' => $_POST['tanggal_lahir'],
             'agama' => $_POST['agama'],
@@ -52,15 +107,14 @@ class ProfileController extends Controller {
             'provinsi' => $_POST['provinsi'],
             'kode_pos' => $_POST['kode_pos']
         ];
-
-        $userModel = $this->model('User_model');
         
+        // 4. Eksekusi Update
         if ($userModel->updateProfile($data)) {
-            // Update nama di session
+            // Update nama di session agar header langsung berubah jika nama diganti
             $_SESSION['nama_lengkap'] = $data['nama_lengkap']; 
-            $_SESSION['flash_message'] = ['text' => 'Profil berhasil di-update.', 'type' => 'success'];
+            $_SESSION['flash_message'] = ['text' => 'Profil berhasil diperbarui.', 'type' => 'success'];
         } else {
-            $_SESSION['flash_message'] = ['text' => 'Gagal mengupdate profil.', 'type' => 'error'];
+            $_SESSION['flash_message'] = ['text' => 'Gagal mengupdate profil di database.', 'type' => 'error'];
         }
 
         header('Location: ' . BASE_URL . 'profile/index');

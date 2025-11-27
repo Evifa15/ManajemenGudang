@@ -10,13 +10,7 @@
 <main class="app-content">
     
     <div class="content-header">
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <a href="<?php echo BASE_URL; ?>admin/barang" class="btn" style="background-color: #6c757d; color: white; text-decoration: none;">
-                &larr; Kembali
-            </a>
-            
-            <h1><?php echo $isEditMode ? 'Edit Barang' : 'Tambah Barang Baru'; ?></h1>
-        </div>
+        <h1><?php echo $isEditMode ? 'Edit Barang' : 'Tambah Barang Baru'; ?></h1>
     </div>
 
     <div class="form-container">

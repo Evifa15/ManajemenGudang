@@ -9,25 +9,21 @@ class Product_model extends Model {
     }
 
     /**
-     * Menghitung total produk (dengan SEMUA filter)
+     * Menghitung total produk (dengan SEMUA filter yang kompleks)
      */
     public function getTotalProductCount($search, $kategori, $merek, $status, $satuan = '', $lokasi = '') {
         $sql = "SELECT COUNT(DISTINCT p.product_id) as total 
                 FROM products p 
+                LEFT JOIN kategori k ON p.kategori_id = k.kategori_id
+                LEFT JOIN merek m ON p.merek_id = m.merek_id
                 LEFT JOIN product_stock ps ON p.product_id = ps.product_id 
                 LEFT JOIN status_barang sb ON ps.status_id = sb.status_id";
         
         $params = [];
         $whereClauses = [];
 
-        // --- INI ADALAH FILTER YANG HILANG ---
         if (!empty($search)) {
-            $whereClauses[] = "(
-                p.kode_barang LIKE :search 
-                OR p.nama_barang LIKE :search 
-                OR k.nama_kategori LIKE :search 
-                OR m.nama_merek LIKE :search
-            )";
+            $whereClauses[] = "(p.kode_barang LIKE :search OR p.nama_barang LIKE :search OR k.nama_kategori LIKE :search OR m.nama_merek LIKE :search)";
             $params[':search'] = '%' . $search . '%';
         }
         if (!empty($kategori)) {
@@ -38,15 +34,14 @@ class Product_model extends Model {
             $whereClauses[] = "p.merek_id = :merek";
             $params[':merek'] = $merek;
         }
-        if (!empty($status)) {
-            $whereClauses[] = "ps.status_id = :status";
-            $params[':status'] = $status;
-        }
-        // --- AKHIR DARI FILTER YANG HILANG ---
-
         if (!empty($satuan)) {
             $whereClauses[] = "p.satuan_id = :satuan";
             $params[':satuan'] = $satuan;
+        }
+        // Filter berdasarkan Stok
+        if (!empty($status)) {
+            $whereClauses[] = "ps.status_id = :status";
+            $params[':status'] = $status;
         }
         if (!empty($lokasi)) {
             $whereClauses[] = "ps.lokasi_id = :lokasi";
@@ -71,34 +66,33 @@ class Product_model extends Model {
         $sql = "SELECT 
                     p.product_id, p.kode_barang, p.nama_barang,
                     k.nama_kategori, m.nama_merek, s.nama_satuan,
-                    (SELECT SUM(ps.quantity) 
+                    -- Subquery untuk menghitung total stok 'Tersedia'
+                    (SELECT COALESCE(SUM(ps.quantity), 0) 
                      FROM product_stock ps 
+                     JOIN status_barang sb2 ON ps.status_id = sb2.status_id
                      WHERE ps.product_id = p.product_id 
-                     AND ps.status_id = (SELECT status_id FROM status_barang WHERE nama_status = 'Tersedia' LIMIT 1)
+                     AND sb2.nama_status = 'Tersedia'
                     ) as stok_saat_ini,
                     p.stok_minimum,
-                    l.kode_lokasi
+                    -- Ambil satu contoh lokasi (GROUP_CONCAT agar tidak duplikat baris)
+                    (SELECT l.kode_lokasi FROM product_stock ps3 
+                     JOIN lokasi l ON ps3.lokasi_id = l.lokasi_id 
+                     WHERE ps3.product_id = p.product_id LIMIT 1) as kode_lokasi
                 FROM 
                     products p
                 LEFT JOIN kategori k ON p.kategori_id = k.kategori_id
                 LEFT JOIN merek m ON p.merek_id = m.merek_id
                 LEFT JOIN satuan s ON p.satuan_id = s.satuan_id
+                -- Join stok untuk keperluan filter
                 LEFT JOIN product_stock ps_filter ON p.product_id = ps_filter.product_id
-                LEFT JOIN lokasi l ON ps_filter.lokasi_id = l.lokasi_id
                 ";
         
         $params = [];
         $whereClauses = [];
 
-        // --- INI ADALAH FILTER YANG HILANG ---
         if (!empty($search)) {
-            $whereClauses[] = "(
-                p.kode_barang LIKE :search 
-                OR p.nama_barang LIKE :search 
-                OR k.nama_kategori LIKE :search 
-                OR m.nama_merek LIKE :search
-            )";
-    $params[':search'] = '%' . $search . '%';
+            $whereClauses[] = "(p.kode_barang LIKE :search OR p.nama_barang LIKE :search OR k.nama_kategori LIKE :search OR m.nama_merek LIKE :search)";
+            $params[':search'] = '%' . $search . '%';
         }
         if (!empty($kategori)) {
             $whereClauses[] = "p.kategori_id = :kategori";
@@ -108,15 +102,14 @@ class Product_model extends Model {
             $whereClauses[] = "p.merek_id = :merek";
             $params[':merek'] = $merek;
         }
-        if (!empty($status)) {
-            $whereClauses[] = "ps_filter.status_id = :status";
-            $params[':status'] = $status;
-        }
-        // --- AKHIR DARI FILTER YANG HILANG ---
-        
         if (!empty($satuan)) {
             $whereClauses[] = "p.satuan_id = :satuan";
             $params[':satuan'] = $satuan;
+        }
+        // Filter Stok
+        if (!empty($status)) {
+            $whereClauses[] = "ps_filter.status_id = :status";
+            $params[':status'] = $status;
         }
         if (!empty($lokasi)) {
             $whereClauses[] = "ps_filter.lokasi_id = :lokasi";
@@ -141,13 +134,13 @@ class Product_model extends Model {
     }
 
     /**
-     * Menyimpan data produk baru (ke 2 tabel) menggunakan Transaksi
+     * Menyimpan data produk baru + Stok Awal (Transaksi DB)
      */
     public function createProduct($data) {
         $this->db->beginTransaction(); 
         
         try {
-            // 1. Insert ke tabel 'products'
+            // 1. Insert Master Barang
             $this->query("INSERT INTO products (kode_barang, nama_barang, deskripsi, kategori_id, merek_id, satuan_id, stok_minimum, bisa_dipinjam, lacak_lot_serial) 
                           VALUES (:kode_barang, :nama_barang, :deskripsi, :kategori_id, :merek_id, :satuan_id, :stok_minimum, :bisa_dipinjam, :lacak_lot_serial)");
             
@@ -162,11 +155,10 @@ class Product_model extends Model {
             $this->bind('lacak_lot_serial', $data['lacak_lot_serial']);
             
             $this->execute();
-            
             $productId = $this->db->lastInsertId();
 
-            // 2. Insert ke tabel 'product_stock'
-            if ($data['stok_awal'] > 0) {
+            // 2. Insert Stok Awal (Jika diisi)
+            if (isset($data['stok_awal']) && $data['stok_awal'] > 0) {
                 $this->query("INSERT INTO product_stock (product_id, status_id, lokasi_id, quantity) 
                               VALUES (:product_id, :status_id, :lokasi_id, :quantity)");
                 
@@ -178,29 +170,21 @@ class Product_model extends Model {
                 $this->execute();
             }
 
-            // 3. Commit
             $this->db->commit();
             return true;
 
         } catch (Exception $e) {
-            // 4. RollBack
             $this->db->rollBack();
             throw $e; 
         }
     }
-    /**
-     * Mengambil satu data master produk berdasarkan ID
-     */
+
     public function getProductById($id) {
         $this->query("SELECT * FROM " . $this->table . " WHERE product_id = :id");
         $this->bind('id', $id, PDO::PARAM_INT);
         return $this->single();
     }
 
-    /**
-     * Mengupdate data master produk di database
-     * (Catatan: Ini HANYA mengupdate data master, BUKAN stok)
-     */
     public function updateProduct($data) {
         $this->query("UPDATE products SET 
                         kode_barang = :kode_barang, 
@@ -214,7 +198,6 @@ class Product_model extends Model {
                         lacak_lot_serial = :lacak_lot_serial
                       WHERE product_id = :product_id");
 
-        // Bind semua data
         $this->bind('kode_barang', $data['kode_barang']);
         $this->bind('nama_barang', $data['nama_barang']);
         $this->bind('deskripsi', $data['deskripsi']);
@@ -228,116 +211,99 @@ class Product_model extends Model {
 
         return $this->execute();
     }
+
     /**
-     * Menghapus data produk dari 2 tabel (products & product_stock)
-     * @param int $id ID produk yang akan dihapus
-     * @return bool True jika berhasil, false jika gagal
+     * Menghapus data produk (Master & Stok)
      */
     public function deleteProductById($id) {
-        // Mulai Transaksi
         $this->db->beginTransaction();
-
         try {
-            // 1. Hapus semua stok terkait dari 'product_stock'
+            // Hapus stok dulu (Foreign Key)
             $this->query("DELETE FROM product_stock WHERE product_id = :id");
             $this->bind('id', $id, PDO::PARAM_INT);
             $this->execute();
 
-            // 2. Hapus data master dari 'products'
+            // Hapus master
             $this->query("DELETE FROM products WHERE product_id = :id");
             $this->bind('id', $id, PDO::PARAM_INT);
             $this->execute();
 
-            // 3. Jika semua berhasil, commit
             $this->db->commit();
             return true;
-
         } catch (Exception $e) {
-            // 4. Jika ada error (misal: foreign key constraint), batalkan
             $this->db->rollBack();
             return false;
         }
     }
+
     /**
-     * Mengambil daftar simpel produk untuk dropdown/autocomplete.
-     * Mengambil juga 'lacak_lot_serial' untuk logika form dinamis.
+     * [DROPDOWN] Daftar Produk Simple (Bisa difilter per kategori)
      */
-    public function getAllProductsList() {
-        $this->query("SELECT product_id, kode_barang, nama_barang, lacak_lot_serial 
-                      FROM " . $this->table . " 
-                      ORDER BY nama_barang ASC");
+    public function getAllProductsList($kategori_id = null) {
+        $sql = "SELECT product_id, kode_barang, nama_barang, lacak_lot_serial 
+                FROM " . $this->table;
+        
+        if ($kategori_id != null) {
+            $sql .= " WHERE kategori_id = :kid";
+        }
+        
+        $sql .= " ORDER BY nama_barang ASC";
+        
+        $this->query($sql);
+        
+        if ($kategori_id != null) {
+            $this->bind('kid', $kategori_id);
+        }
+        
         return $this->resultSet();
     }
+
     /**
-     * Mengambil semua stok yang TERSEDIA untuk satu produk.
-     * Digunakan oleh form 'Barang Keluar' untuk validasi & FEFO.
-     * @param int $productId ID produk
-     * @return array
+     * [BARANG KELUAR] Ambil Stok Tersedia + FEFO (First Expired First Out)
      */
     public function getAvailableStockForProduct($productId) {
-        // Kita JOIN dengan lokasi & status
-        // Kita cari HANYA stok yang 'Tersedia' dan quantity > 0
-        // Kita urutkan berdasarkan exp_date ASC (First Expired First Out)
-        
         $this->query("SELECT 
                         ps.stock_id, ps.quantity, ps.lot_number, ps.exp_date,
                         l.kode_lokasi, l.nama_rak
-                      FROM 
-                        product_stock ps
+                      FROM product_stock ps
                       LEFT JOIN lokasi l ON ps.lokasi_id = l.lokasi_id
                       LEFT JOIN status_barang sb ON ps.status_id = sb.status_id
-                      WHERE 
-                        ps.product_id = :pid 
-                        AND sb.nama_status = 'Tersedia' 
-                        AND ps.quantity > 0
-                      ORDER BY 
-                        ps.exp_date ASC, ps.stock_id ASC");
+                      WHERE ps.product_id = :pid AND sb.nama_status = 'Tersedia' AND ps.quantity > 0
+                      ORDER BY ps.exp_date ASC, ps.stock_id ASC");
         
         $this->bind('pid', $productId);
         return $this->resultSet();
     }
-    // (Tambahkan ini di bawah getAllProductsList)
+
     /**
-     * Mengambil daftar produk yang ditandai 'bisa_dipinjam' (Untuk Katalog Peminjam)
+     * [PEMINJAMAN] Ambil produk yang boleh dipinjam
      */
     public function getProductsForLoan() {
-        $this->query("SELECT p.product_id, p.kode_barang, p.nama_barang, p.deskripsi,
-                        k.nama_kategori
-                      FROM products p
-                      LEFT JOIN kategori k ON p.kategori_id = k.kategori_id
-                      WHERE p.bisa_dipinjam = 1
-                      ORDER BY p.nama_barang ASC");
+        $this->query("SELECT p.product_id, p.kode_barang, p.nama_barang, p.deskripsi, k.nama_kategori
+                      FROM products p LEFT JOIN kategori k ON p.kategori_id = k.kategori_id
+                      WHERE p.bisa_dipinjam = 1 ORDER BY p.nama_barang ASC");
         return $this->resultSet();
     }
+
     /**
-     * Mencari lokasi stok berdasarkan nama barang (untuk Staff)
-     * @param string $search Nama barang
-     * @return array
+     * [STAFF] Cari Lokasi Barang
      */
     public function findStockLocationsByName($search) {
-        // Gabungkan product, product_stock, lokasi, dan status 'Tersedia'
-        $this->query("SELECT 
-                        p.nama_barang, p.kode_barang,
-                        ps.quantity, ps.lot_number, ps.exp_date,
-                        l.kode_lokasi, l.nama_rak, l.zona
-                      FROM 
-                        product_stock ps
+        $this->query("SELECT p.nama_barang, p.kode_barang, ps.quantity, ps.lot_number, ps.exp_date, l.kode_lokasi, l.nama_rak
+                      FROM product_stock ps
                       JOIN products p ON ps.product_id = p.product_id
                       JOIN lokasi l ON ps.lokasi_id = l.lokasi_id
                       JOIN status_barang sb ON ps.status_id = sb.status_id
-                      WHERE 
-                        (p.nama_barang LIKE :search OR p.kode_barang = :search_plain)
-                        AND sb.nama_status = 'Tersedia'
-                        AND ps.quantity > 0
-                      ORDER BY 
-                        l.kode_lokasi ASC, ps.exp_date ASC");
-        
+                      WHERE (p.nama_barang LIKE :search OR p.kode_barang = :search_plain)
+                        AND sb.nama_status = 'Tersedia' AND ps.quantity > 0
+                      ORDER BY l.kode_lokasi ASC");
         $this->bind('search', '%' . $search . '%');
         $this->bind('search_plain', $search);
         return $this->resultSet();
     }
+
     /**
-     * [DASHBOARD] Menghitung jumlah item yang stoknya menipis
+     * [DASHBOARD] Hitung Stok Menipis
      */
     public function getJumlahStokMenipis() {
         $this->query("SELECT COUNT(p.product_id) as total
@@ -351,18 +317,35 @@ class Product_model extends Model {
                       WHERE COALESCE(stok.total_stok, 0) < p.stok_minimum");
         return $this->single()['total'];
     }
+
     public function deleteBulkProducts($ids) {
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        
-        // Hapus Stok dulu (Foreign Key)
         $this->query("DELETE FROM product_stock WHERE product_id IN ($placeholders)");
         foreach ($ids as $k => $id) { $this->bind(($k+1), $id); }
         $this->execute();
 
-        // Hapus Master Produk
         $this->query("DELETE FROM products WHERE product_id IN ($placeholders)");
         foreach ($ids as $k => $id) { $this->bind(($k+1), $id); }
         return $this->execute();
     }
+
+    /**
+     * [AJAX] Mengambil daftar produk detail berdasarkan Kategori ID
+     */
+    public function getProductsByCategoryId($kategori_id) {
+        $sql = "SELECT p.kode_barang, p.nama_barang, m.nama_merek, 
+                       (SELECT l.kode_lokasi FROM product_stock ps 
+                        JOIN lokasi l ON ps.lokasi_id = l.lokasi_id 
+                        WHERE ps.product_id = p.product_id LIMIT 1) as lokasi_utama
+                FROM products p
+                LEFT JOIN merek m ON p.merek_id = m.merek_id
+                WHERE p.kategori_id = :kid
+                ORDER BY p.nama_barang ASC";
+        
+        $this->query($sql);
+        $this->bind('kid', $kategori_id);
+        return $this->resultSet();
+    }
+
     
 }

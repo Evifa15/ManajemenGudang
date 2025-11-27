@@ -42,7 +42,7 @@
         </div>
 
         <form action="<?php echo BASE_URL; ?>admin/users" method="GET" style="flex: 1;">
-            <select name="role" class="filter-select" onchange="this.form.submit()" style="width: 100%; cursor: pointer;">
+            <select name="role" id="filterRole" class="filter-select" style="width: 100%; cursor: pointer;">
                 <option value="">-- Filter Sesuai Role --</option>
                 <option value="admin" <?php if($data['role'] == 'admin') echo 'selected'; ?>>Admin</option>
                 <option value="staff" <?php if($data['role'] == 'staff') echo 'selected'; ?>>Staff Gudang</option>

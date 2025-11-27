@@ -33,8 +33,11 @@
 
         <li><a href="#">Menu Operasi Kritis</a>
             <ul class="submenu">
-                <li class="<?php echo (str_starts_with($data['judul'], 'Stock Opname')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/stockOpname">Stock Opname</a>
+                <li class="<?php echo (str_starts_with($data['judul'], 'Perintah Opname')) ? 'active' : ''; ?>">
+                    <a href="<?php echo BASE_URL; ?>admin/perintahOpname">Perintah Opname (Aktif)</a>
+                </li>
+                <li class="<?php echo (str_starts_with($data['judul'], 'Riwayat Opname')) ? 'active' : ''; ?>">
+                    <a href="<?php echo BASE_URL; ?>admin/riwayatOpname">Riwayat / Arsip Opname</a>
                 </li>
             </ul>
         </li>

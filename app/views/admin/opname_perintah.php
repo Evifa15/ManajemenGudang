@@ -7,7 +7,6 @@
 ?>
 
 <style>
-    /* Styling Dashboard Opname */
     .opname-header-card {
         background: #fff;
         border-left: 5px solid #007bff;
@@ -35,12 +34,23 @@
     .status-pending { background: #e2e3e5; color: #383d41; }
     .status-progress { background: #cce5ff; color: #004085; }
     .status-submitted { background: #d4edda; color: #155724; }
+    
+    .opname-status-box {
+        padding: 40px;
+        margin-top: 20px;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid transparent;
+        margin-bottom: 30px; 
+    }
+    .opname-status-box h2, .opname-status-box h3 { margin-bottom: 10px; }
+    .opname-status-box p { margin-bottom: 20px; font-size: 1.1em; }
 </style>
 
-<main class="app-content">
+<main class="app-content" id="opnamePerintahPage" data-base-url="<?php echo BASE_URL; ?>">
     
     <div class="content-header">
-        <h1>Stock Opname / Penyesuaian Stok</h1>
+        <h1>Perintah Stock Opname (Aktif)</h1>
     </div>
 
     <?php
@@ -61,7 +71,7 @@
                     <div style="display: flex; gap: 20px;">
                         <div class="form-group" style="flex: 1;">
                             <label>Nomor Surat Perintah (SP)</label>
-                            <input type="text" name="nomor_sp" value="SP-SO-<?php echo date('Ymd-His'); ?>" readonly style="background: #eee;">
+                            <input type="text" name="nomor_sp" placeholder="Masukkan Nomor SP (Misal: SP/SO/001)" required>
                         </div>
                         <div class="form-group" style="flex: 1;">
                             <label>Target / Deadline Selesai</label>
@@ -76,17 +86,32 @@
 
                     <div class="form-group">
                         <label style="margin-bottom: 10px; display:block;">Pilih Lingkup (Scope) Kategori:</label>
-                        <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 5px;">
+                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; border-radius: 5px;">
                             
-                            <label style="display: block; padding: 5px; font-weight: bold; border-bottom: 1px solid #eee;">
-                                <input type="checkbox" id="checkAll" name="kategori_ids[]" value="ALL" checked> Pilih Semua Kategori
-                            </label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; background: #f9f9f9;">
+                                <label style="font-weight: bold; cursor: pointer; flex-grow: 1;">
+                                    <input type="checkbox" id="checkAll" name="kategori_ids[]" value="ALL" checked style="transform: scale(1.2); margin-right: 8px;"> 
+                                    Pilih Semua Kategori
+                                </label>
+                            </div>
 
                             <?php foreach($data['allKategori'] as $kat): ?>
-                                <label style="display: block; padding: 5px;">
-                                    <input type="checkbox" class="cat-check" name="kategori_ids[]" value="<?php echo $kat['kategori_id']; ?>" checked> 
-                                    <?php echo htmlspecialchars($kat['nama_kategori']); ?>
-                                </label>
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+                                    
+                                    <label style="cursor: pointer; flex-grow: 1; display: flex; align-items: center;">
+                                        <input type="checkbox" class="cat-check" name="kategori_ids[]" value="<?php echo $kat['kategori_id']; ?>" checked style="transform: scale(1.2); margin-right: 10px;"> 
+                                        <?php echo htmlspecialchars($kat['nama_kategori']); ?>
+                                    </label>
+
+                                    <button type="button" class="btn btn-sm btn-info btn-detail-cat" 
+                                            data-id="<?php echo $kat['kategori_id']; ?>" 
+                                            data-nama="<?php echo htmlspecialchars($kat['nama_kategori']); ?>"
+                                            style="background: #17a2b8; border:none; color:white; border-radius: 4px; padding: 2px 8px; font-size: 0.8em; cursor:pointer;"
+                                            title="Lihat daftar barang di kategori ini">
+                                        👁️ Detail
+                                    </button>
+
+                                </div>
                             <?php endforeach; ?>
                         </div>
                     </div>
@@ -100,17 +125,6 @@
             </form>
         </div>
 
-        <script>
-            // Script Sederhana Check All
-            document.getElementById('checkAll').addEventListener('change', function() {
-                let checkboxes = document.querySelectorAll('.cat-check');
-                checkboxes.forEach(cb => {
-                    cb.checked = this.checked;
-                    cb.disabled = this.checked; // Disable individual kalau All terpilih (opsional)
-                });
-            });
-        </script>
-
     <?php elseif ($activePeriod && $report == null): ?>
         
         <div class="opname-header-card">
@@ -119,26 +133,22 @@
                     <h2 style="color: #007bff; margin-bottom: 5px;"><?php echo htmlspecialchars($activePeriod['nomor_sp']); ?></h2>
                     <p><strong>Status:</strong> <span class="status-progress" style="font-size:1em;">SEDANG BERLANGSUNG</span></p>
                     <p><small>Mulai: <?php echo date('d M Y, H:i', strtotime($activePeriod['start_date'])); ?> | Oleh: <?php echo htmlspecialchars($activePeriod['admin_name']); ?></small></p>
-                    
                     <?php if($activePeriod['catatan_admin']): ?>
                         <div style="background: #fff3cd; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ffeeba;">
                             <strong>Catatan:</strong> "<?php echo htmlspecialchars($activePeriod['catatan_admin']); ?>"
                         </div>
                     <?php endif; ?>
                 </div>
-                
                 <div style="text-align: right;">
-                    <a href="<?php echo BASE_URL; ?>admin/stockOpname?view_report=1" class="btn btn-warning" style="margin-bottom: 5px;">
+                    <a href="<?php echo BASE_URL; ?>admin/perintahOpname?view_report=1" class="btn btn-warning" style="margin-bottom: 5px;">
                         📋 Tarik Laporan & Finalisasi
                     </a>
-                    <br>
-                    <small>Klik tombol di atas jika semua tugas selesai.</small>
+                    <br><small>Klik jika semua tugas selesai.</small>
                 </div>
             </div>
         </div>
 
         <h3 style="margin-bottom: 15px;">Pantauan Progres Tugas (Per Kategori)</h3>
-        
         <div class="task-list">
             <?php if(empty($data['taskProgress'])): ?>
                 <p>Tidak ada data tugas.</p>
@@ -146,16 +156,12 @@
                 <?php foreach($data['taskProgress'] as $task): ?>
                     <div class="task-card">
                         <div>
-                            <strong><?php echo htmlspecialchars($task['nama_kategori']); ?></strong>
-                            <br>
+                            <strong><?php echo htmlspecialchars($task['nama_kategori']); ?></strong><br>
                             <small>
-                                <?php 
-                                    if ($task['status_task'] == 'Pending') echo "Belum ada yang mengambil";
-                                    else echo "Dikerjakan oleh: <strong>" . htmlspecialchars($task['staff_name']) . "</strong>";
-                                ?>
+                                <?php if ($task['status_task'] == 'Pending') echo "Belum ada yang mengambil";
+                                    else echo "Dikerjakan oleh: <strong>" . htmlspecialchars($task['staff_name']) . "</strong>"; ?>
                             </small>
                         </div>
-                        
                         <div class="task-status status-<?php echo strtolower(str_replace(' ', '-', $task['status_task'])); ?>">
                             <?php echo $task['status_task']; ?>
                         </div>
@@ -177,12 +183,7 @@
                 <table style="width: 100%;">
                     <thead style="position: sticky; top: 0; background: #eee; z-index: 10;">
                         <tr>
-                            <th>Kode Barang</th>
-                            <th>Nama Barang</th>
-                            <th style="text-align: center;">Stok Sistem</th>
-                            <th style="text-align: center;">Stok Fisik</th>
-                            <th style="text-align: center;">Selisih</th>
-                            <th style="text-align: center;">Status</th>
+                            <th>Kode</th> <th>Nama Barang</th> <th style="text-align: center;">Stok Sistem</th> <th style="text-align: center;">Stok Fisik</th> <th style="text-align: center;">Selisih</th> <th style="text-align: center;">Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -207,43 +208,12 @@
                     </tbody>
                 </table>
             </div>
-
             <div class="form-actions" style="margin-top: 20px; padding: 20px; background: #f8f9fa; border-top: 1px solid #ddd; text-align: right;">
-                <a href="<?php echo BASE_URL; ?>admin/stockOpname" class="btn" style="background: #6c757d; color: white; margin-right: 10px;">&larr; Kembali Monitor</a>
+                <a href="<?php echo BASE_URL; ?>admin/perintahOpname" class="btn" style="background: #6c757d; color: white; margin-right: 10px;">&larr; Kembali Monitor</a>
                 <button type="submit" class="btn btn-danger" onclick="return confirm('Tutup periode opname ini?');">✅ Setujui & Tutup SP</button>
             </div>
         </form>
     <?php endif; ?>
-
-    <div style="margin-top: 50px;">
-        <h3>🗂️ Arsip Surat Perintah Opname</h3>
-        <div class="content-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>No. SP</th>
-                        <th>Tgl Mulai</th>
-                        <th>Tgl Selesai</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if(empty($data['completedPeriods'])): ?>
-                        <tr><td colspan="4" style="text-align:center;">Belum ada arsip.</td></tr>
-                    <?php else: ?>
-                        <?php foreach($data['completedPeriods'] as $period): ?>
-                        <tr>
-                            <td><?php echo htmlspecialchars($period['nomor_sp'] ?? ('Period #' . $period['period_id'])); ?></td>
-                            <td><?php echo date('d-m-Y', strtotime($period['start_date'])); ?></td>
-                            <td><?php echo $period['end_date'] ? date('d-m-Y', strtotime($period['end_date'])) : '-'; ?></td>
-                            <td><span style="color: green; font-weight: bold;">Selesai</span></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
 </main>
+
 <?php require_once APPROOT . '/views/templates/footer.php'; ?>

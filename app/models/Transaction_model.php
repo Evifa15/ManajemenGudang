@@ -9,9 +9,9 @@ class Transaction_model extends Model {
     }
 
     /**
-     * Menghitung total riwayat barang masuk (VERSI SUPER SEARCH)
+     * Menghitung total riwayat barang masuk (DENGAN FILTER TANGGAL)
      */
-    public function getTotalRiwayatMasukCount($search) {
+    public function getTotalRiwayatMasukCount($search, $startDate = null, $endDate = null) {
         $sql = "SELECT COUNT(st.transaction_id) as total
                 FROM " . $this->table . " st
                 LEFT JOIN products p ON st.product_id = p.product_id
@@ -20,22 +20,23 @@ class Transaction_model extends Model {
                 WHERE st.tipe_transaksi = 'masuk'";
         
         $params = [];
-        $whereClauses = [];
-
+        
+        // 1. Filter Search
         if (!empty($search)) {
-            // PENCARIAN DI 5 KOLOM:
-            $whereClauses[] = "(
+            $sql .= " AND (
                 p.nama_barang LIKE :search 
                 OR st.lot_number LIKE :search 
                 OR s.nama_supplier LIKE :search 
                 OR u.nama_lengkap LIKE :search 
-                OR DATE(st.created_at) LIKE :search
             )";
             $params[':search'] = '%' . $search . '%';
         }
 
-        if (!empty($whereClauses)) {
-            $sql .= " AND " . implode(" AND ", $whereClauses);
+        // 2. Filter Tanggal (Periode)
+        if (!empty($startDate) && !empty($endDate)) {
+            $sql .= " AND DATE(st.created_at) BETWEEN :start AND :end";
+            $params[':start'] = $startDate;
+            $params[':end'] = $endDate;
         }
 
         $this->query($sql);
@@ -46,37 +47,40 @@ class Transaction_model extends Model {
     }
 
     /**
-     * Mengambil data riwayat barang masuk dengan paginasi (VERSI SUPER SEARCH)
+     * Mengambil data riwayat barang masuk (DENGAN FILTER TANGGAL)
      */
-    public function getRiwayatMasukPaginated($limit, $offset, $search) {
+    public function getRiwayatMasukPaginated($limit, $offset, $search, $startDate = null, $endDate = null) {
         $sql = "SELECT 
-                    st.created_at, p.nama_barang, st.jumlah, s.nama_supplier, 
+                    st.created_at, p.nama_barang, st.jumlah, 
+                    sat.nama_satuan, s.nama_supplier, 
                     u.nama_lengkap as staff_nama, st.lot_number, st.exp_date, st.bukti_foto
                 FROM 
                     " . $this->table . " st
                 LEFT JOIN products p ON st.product_id = p.product_id
                 LEFT JOIN suppliers s ON st.supplier_id = s.supplier_id
                 LEFT JOIN users u ON st.user_id = u.user_id
+                LEFT JOIN satuan sat ON p.satuan_id = sat.satuan_id 
                 WHERE 
                     st.tipe_transaksi = 'masuk'";
         
         $params = [];
-        $whereClauses = [];
 
+        // 1. Filter Search
         if (!empty($search)) {
-            // PENCARIAN DI 5 KOLOM:
-            $whereClauses[] = "(
+            $sql .= " AND (
                 p.nama_barang LIKE :search 
                 OR st.lot_number LIKE :search 
                 OR s.nama_supplier LIKE :search 
                 OR u.nama_lengkap LIKE :search
-                OR DATE(st.created_at) LIKE :search
             )";
             $params[':search'] = '%' . $search . '%';
         }
 
-        if (!empty($whereClauses)) {
-            $sql .= " AND " . implode(" AND ", $whereClauses);
+        // 2. Filter Tanggal
+        if (!empty($startDate) && !empty($endDate)) {
+            $sql .= " AND DATE(st.created_at) BETWEEN :start AND :end";
+            $params[':start'] = $startDate;
+            $params[':end'] = $endDate;
         }
 
         $sql .= " ORDER BY st.created_at DESC LIMIT :limit OFFSET :offset";
@@ -183,10 +187,11 @@ class Transaction_model extends Model {
             throw $e; 
         }
     }
+
     /**
-     * Menghitung total riwayat barang keluar (VERSI SUPER SEARCH)
+     * [UPDATED] Menghitung total riwayat barang keluar (DENGAN DATE FILTER)
      */
-    public function getTotalRiwayatKeluarCount($search) {
+    public function getTotalRiwayatKeluarCount($search, $startDate = null, $endDate = null) {
         $sql = "SELECT COUNT(st.transaction_id) as total
                 FROM " . $this->table . " st
                 LEFT JOIN products p ON st.product_id = p.product_id
@@ -195,23 +200,23 @@ class Transaction_model extends Model {
                 WHERE st.tipe_transaksi = 'keluar'";
         
         $params = [];
-        $whereClauses = [];
-
+        
         if (!empty($search)) {
-            // PENCARIAN DI 6 KOLOM:
-            $whereClauses[] = "(
+            $sql .= " AND (
                 p.nama_barang LIKE :search 
                 OR st.lot_number LIKE :search 
                 OR st.keterangan LIKE :search 
                 OR u.nama_lengkap LIKE :search 
                 OR s.nama_satuan LIKE :search
-                OR DATE(st.created_at) LIKE :search
             )";
             $params[':search'] = '%' . $search . '%';
         }
 
-        if (!empty($whereClauses)) {
-            $sql .= " AND " . implode(" AND ", $whereClauses);
+        // Filter Tanggal
+        if (!empty($startDate) && !empty($endDate)) {
+            $sql .= " AND DATE(st.created_at) BETWEEN :start AND :end";
+            $params[':start'] = $startDate;
+            $params[':end'] = $endDate;
         }
 
         $this->query($sql);
@@ -222,9 +227,9 @@ class Transaction_model extends Model {
     }
 
     /**
-     * Mengambil data riwayat barang keluar dengan paginasi (VERSI SUPER SEARCH)
+     * [UPDATED] Mengambil data riwayat barang keluar (DENGAN DATE FILTER)
      */
-    public function getRiwayatKeluarPaginated($limit, $offset, $search) {
+    public function getRiwayatKeluarPaginated($limit, $offset, $search, $startDate = null, $endDate = null) {
         $sql = "SELECT 
                     st.created_at, p.nama_barang, st.jumlah, st.keterangan, 
                     u.nama_lengkap as staff_nama, st.lot_number, s.nama_satuan
@@ -237,23 +242,23 @@ class Transaction_model extends Model {
                     st.tipe_transaksi = 'keluar'";
         
         $params = [];
-        $whereClauses = [];
 
         if (!empty($search)) {
-            // PENCARIAN DI 6 KOLOM:
-            $whereClauses[] = "(
+            $sql .= " AND (
                 p.nama_barang LIKE :search 
                 OR st.lot_number LIKE :search 
                 OR st.keterangan LIKE :search 
                 OR u.nama_lengkap LIKE :search
                 OR s.nama_satuan LIKE :search
-                OR DATE(st.created_at) LIKE :search
             )";
             $params[':search'] = '%' . $search . '%';
         }
 
-        if (!empty($whereClauses)) {
-            $sql .= " AND " . implode(" AND ", $whereClauses);
+        // Filter Tanggal
+        if (!empty($startDate) && !empty($endDate)) {
+            $sql .= " AND DATE(st.created_at) BETWEEN :start AND :end";
+            $params[':start'] = $startDate;
+            $params[':end'] = $endDate;
         }
 
         $sql .= " ORDER BY st.created_at DESC LIMIT :limit OFFSET :offset";
@@ -335,10 +340,11 @@ class Transaction_model extends Model {
             throw $e; 
         }
     }
+
     /**
-     * Menghitung total riwayat barang retur/rusak (VERSI SUPER SEARCH)
+     * [UPDATED] Menghitung total riwayat barang retur (DENGAN DATE FILTER)
      */
-    public function getTotalRiwayatReturCount($search) {
+    public function getTotalRiwayatReturCount($search, $startDate = null, $endDate = null) {
         $sql = "SELECT COUNT(st.transaction_id) as total
                 FROM " . $this->table . " st
                 LEFT JOIN products p ON st.product_id = p.product_id
@@ -347,22 +353,22 @@ class Transaction_model extends Model {
                 WHERE st.tipe_transaksi = 'retur'";
         
         $params = [];
-        $whereClauses = [];
 
         if (!empty($search)) {
-            // Pencarian di 5 kolom
-            $whereClauses[] = "(
+            $sql .= " AND (
                 p.nama_barang LIKE :search 
                 OR st.lot_number LIKE :search 
                 OR sb.nama_status LIKE :search 
                 OR u.nama_lengkap LIKE :search
-                OR DATE(st.created_at) LIKE :search
             )";
             $params[':search'] = '%' . $search . '%';
         }
 
-        if (!empty($whereClauses)) {
-            $sql .= " AND " . implode(" AND ", $whereClauses);
+        // Filter Tanggal
+        if (!empty($startDate) && !empty($endDate)) {
+            $sql .= " AND DATE(st.created_at) BETWEEN :start AND :end";
+            $params[':start'] = $startDate;
+            $params[':end'] = $endDate;
         }
 
         $this->query($sql);
@@ -374,9 +380,9 @@ class Transaction_model extends Model {
 
     
     /**
-     * Mengambil data riwayat barang retur/rusak dengan paginasi (VERSI SUPER SEARCH)
+     * [UPDATED] Mengambil data riwayat retur (DENGAN DATE FILTER)
      */
-    public function getRiwayatReturPaginated($limit, $offset, $search) {
+    public function getRiwayatReturPaginated($limit, $offset, $search, $startDate = null, $endDate = null) {
         $sql = "SELECT 
                     st.created_at, p.nama_barang, st.jumlah, st.keterangan, 
                     u.nama_lengkap as staff_nama, st.lot_number, sb.nama_status
@@ -389,28 +395,28 @@ class Transaction_model extends Model {
                     st.tipe_transaksi = 'retur'";
         
         $params = [];
-        $whereClauses = [];
 
         if (!empty($search)) {
-             $whereClauses[] = "(
+             $sql .= " AND (
                 p.nama_barang LIKE :search 
                 OR st.lot_number LIKE :search 
                 OR sb.nama_status LIKE :search 
                 OR u.nama_lengkap LIKE :search
-                OR DATE(st.created_at) LIKE :search
             )";
             $params[':search'] = '%' . $search . '%';
         }
 
-        if (!empty($whereClauses)) {
-            $sql .= " AND " . implode(" AND ", $whereClauses);
+        // Filter Tanggal
+        if (!empty($startDate) && !empty($endDate)) {
+            $sql .= " AND DATE(st.created_at) BETWEEN :start AND :end";
+            $params[':start'] = $startDate;
+            $params[':end'] = $endDate;
         }
 
         $sql .= " ORDER BY st.created_at DESC LIMIT :limit OFFSET :offset";
         $params[':limit'] = $limit;
         $params[':offset'] = $offset;
 
-        // --- PERBAIKAN DI BAWAH INI ---
         $this->query($sql);
         foreach ($params as $key => &$value) {
             $type = ($key == ':limit' || $key == ':offset') ? PDO::PARAM_INT : PDO::PARAM_STR;
@@ -419,6 +425,7 @@ class Transaction_model extends Model {
         
         return $this->resultSet();
     }
+    
     /**
      * Menambahkan transaksi retur/rusak (MEMINDAHKAN STOK).
      * Ini adalah method transaksional:

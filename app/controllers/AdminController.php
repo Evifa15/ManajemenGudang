@@ -12,6 +12,10 @@ class AdminController extends Controller {
         }
     }
 
+    public function index() {
+        $this->dashboard();
+    }
+
     /**
  * Menampilkan Halaman Dashboard Admin
  * (Versi LENGKAP dengan data Absensi)
@@ -141,7 +145,7 @@ public function dashboard() {
     }
 
 
-/**
+    /**
      * Menampilkan halaman Manajemen Pengguna (DENGAN PAGINASI, SEARCH & FILTER)
      * URL: /admin/users/[halaman]
      * @param int $page Nomor halaman saat ini
@@ -187,15 +191,7 @@ public function dashboard() {
             exit; // Stop eksekusi di sini!
         }
         // 🔥 AKHIR LOGIKA BARU 🔥
-        if (isset($_GET['ajax'])) {
-            header('Content-Type: application/json');
-            echo json_encode([
-                'users' => $paginatedUsers,
-                'totalPages' => $totalPages,
-                'currentPage' => $page
-            ]);
-            exit; // Stop, jangan load view di bawahnya
-        }
+
         // 8. Siapkan data untuk dikirim ke view
         $data = [
             'judul' => 'Manajemen Pengguna',
@@ -209,6 +205,7 @@ public function dashboard() {
         // 9. Muat file view
         $this->view('admin/manage_users', $data);
     }
+
     /**
      * Menampilkan halaman form tambah pengguna
      */
@@ -376,6 +373,7 @@ public function dashboard() {
         header('Location: ' . BASE_URL . 'admin/users');
         exit;
     }
+
     /**
      * Memproses file CSV yang di-upload untuk import pengguna
      * Format CSV Wajib: Nama Lengkap, Email, Password, Role
@@ -394,34 +392,28 @@ public function dashboard() {
             exit;
         }
 
-        // 3. Dapatkan path file sementara
+        // 3. Baca dan Parsing File CSV
         $filePath = $_FILES['csv_file']['tmp_name'];
-
-        // 4. Baca dan Parsing File CSV
         $usersToImport = [];
         
         if (($handle = fopen($filePath, "r")) !== FALSE) {
-            
-            // (Opsional) Lewati baris pertama jika itu adalah HEADER
-            // fgetcsv($handle, 1000, ","); 
-
             while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                // Kita butuh minimal 4 kolom: Nama, Email, Password, Role
+                // Validasi minimal 4 kolom
                 if (count($data) >= 4) {
-                    // Bersihkan data
                     $nama = trim($data[0]);
                     $email = trim($data[1]);
-                    $rawPassword = trim($data[2]); // Password dari CSV
-                    $role = strtolower(trim($data[3])); // Pastikan lowercase (admin, staff, dll)
+                    $pass = trim($data[2]);
+                    $role = strtolower(trim($data[3]));
 
-                    // Validasi sederhana
-                    if (!empty($nama) && !empty($email) && !empty($rawPassword) && !empty($role)) {
+                    // Filter baris header (jika ada kata 'email' di kolom email)
+                    if (strtolower($email) == 'email') continue;
+
+                    if (!empty($nama) && !empty($email) && !empty($pass) && !empty($role)) {
                         $usersToImport[] = [
                             'nama_lengkap' => $nama,
                             'email'        => $email,
-                            'password'     => $rawPassword, // Kirim password asli ke Model (nanti di-hash di sana)
+                            'password'     => $pass,
                             'role'         => $role
-                            // 'status_login' sudah TIDAK ADA
                         ];
                     }
                 }
@@ -429,31 +421,53 @@ public function dashboard() {
             fclose($handle); 
         }
 
-        // 5. Kirim data ke Model
+        // 4. Kirim ke Model & Proses Hasil
         if (!empty($usersToImport)) {
             $userModel = $this->model('User_model');
             
-            // Model User_model->importUsers() kamu sudah aman
-            // karena dia akan melakukan hashing password di dalam looping-nya.
+            // Panggil model yang baru (Smart Import)
             $result = $userModel->importUsers($usersToImport);
 
-            if (isset($result['error'])) {
-                $_SESSION['flash_message'] = ['text' => 'Import Gagal Total! Error: ' . $result['error'], 'type' => 'error'];
-            } else {
-                $msg = "Import Selesai. Berhasil: {$result['success']}. Gagal: {$result['fail']}.";
-                if (!empty($result['failed_emails'])) {
-                    $msg .= " (Email duplikat: " . implode(', ', $result['failed_emails']) . ")";
-                }
-                $_SESSION['flash_message'] = ['text' => $msg, 'type' => 'success'];
+            // Buat Pesan Laporan
+            $msgText = "Import Selesai. <br>";
+            $msgType = 'success';
+
+            // Rincian Sukses
+            if ($result['success'] > 0) {
+                $msgText .= "✅ <b>{$result['success']}</b> data berhasil masuk.<br>";
             }
+
+            // Rincian Skipped (Duplikat)
+            if ($result['skipped'] > 0) {
+                $msgText .= "⚠️ <b>{$result['skipped']}</b> data dilewati karena email sudah ada.<br>";
+                // Opsional: Tampilkan list email yg skip (bisa dihapus jika terlalu panjang)
+                // $msgText .= "<small>(" . implode(', ', $result['skipped_list']) . ")</small>";
+                
+                // Jika tidak ada yang sukses sama sekali, ubah warna jadi warning
+                if ($result['success'] == 0) $msgType = 'warning';
+            }
+
+            // Rincian Error Lain
+            if ($result['errors'] > 0) {
+                $msgText .= "❌ <b>{$result['errors']}</b> data gagal karena error sistem.";
+                $msgType = 'warning';
+            }
+
+            if ($result['success'] == 0 && $result['skipped'] == 0 && $result['errors'] == 0) {
+                 $msgText = "Tidak ada data valid yang ditemukan dalam CSV.";
+                 $msgType = 'error';
+            }
+
+            $_SESSION['flash_message'] = ['text' => $msgText, 'type' => $msgType];
+
         } else {
-            $_SESSION['flash_message'] = ['text' => 'File CSV kosong atau format salah (Butuh 4 Kolom).', 'type' => 'error'];
+            $_SESSION['flash_message'] = ['text' => 'File CSV kosong atau format salah.', 'type' => 'error'];
         }
 
-        // 6. Kembalikan ke halaman daftar user
         header('Location: ' . BASE_URL . 'admin/users');
         exit;
     }
+    
     /*
     |--------------------------------------------------------------------------
     | METODE UNTUK MANAJEMEN SUPPLIER
@@ -1192,51 +1206,62 @@ exit;
      * Menampilkan halaman Manajemen Barang
      */
     public function barang($page = 1) {
-    // 1. Ambil parameter
-    $search = $_GET['search'] ?? '';
-    $kategori = $_GET['kategori'] ?? '';
-    $merek = $_GET['merek'] ?? '';
-    $status = $_GET['status'] ?? '';
-    $satuan = $_GET['satuan'] ?? '';
-    $lokasi = $_GET['lokasi'] ?? '';
-    $limit = 10;
-    $page = (int)$page;
-    if ($page < 1) $page = 1;
+        // 1. Ambil parameter
+        $search = $_GET['search'] ?? '';
+        $kategori = $_GET['kategori'] ?? '';
+        $merek = $_GET['merek'] ?? '';
+        $status = $_GET['status'] ?? '';
+        $satuan = $_GET['satuan'] ?? '';
+        $lokasi = $_GET['lokasi'] ?? '';
+        $limit = 10;
+        $page = (int)$page;
+        if ($page < 1) $page = 1;
 
-    $productModel = $this->model('Product_model');
-    
-    // 2. Hitung Data
-    $totalProducts = $productModel->getTotalProductCount($search, $kategori, $merek, $status, $satuan, $lokasi);
-    $totalPages = ceil($totalProducts / $limit);
-    $offset = ($page - 1) * $limit;
-    $paginatedProducts = $productModel->getProductsPaginated($limit, $offset, $search, $kategori, $merek, $status, $satuan, $lokasi);
+        $productModel = $this->model('Product_model');
+        
+        // 2. Hitung Data
+        $totalProducts = $productModel->getTotalProductCount($search, $kategori, $merek, $status, $satuan, $lokasi);
+        $totalPages = ceil($totalProducts / $limit);
+        $offset = ($page - 1) * $limit;
+        $paginatedProducts = $productModel->getProductsPaginated($limit, $offset, $search, $kategori, $merek, $status, $satuan, $lokasi);
 
-    // 3. [BARU] Cek Apakah ini Request AJAX?
+        // 3. [AJAX] Render HTML Tabel (UPDATE BAGIAN INI)
     if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
-        // Jika iya, kirim JSON dan STOP di sini.
         header('Content-Type: application/json');
         
-        // Kita perlu render baris tabel menjadi HTML string agar mudah dipasang di JS
         $html = '';
         if (empty($paginatedProducts)) {
-            $html = '<tr><td colspan="9" style="text-align:center;">Data tidak ditemukan.</td></tr>';
+            $html = '<tr><td colspan="11" style="text-align:center;">Data tidak ditemukan.</td></tr>';
         } else {
             foreach ($paginatedProducts as $prod) {
-                // URL untuk tombol edit/hapus
                 $editUrl = BASE_URL . 'admin/editBarang/' . $prod['product_id'];
                 $deleteUrl = BASE_URL . 'admin/deleteBarang/' . $prod['product_id'];
                 
+                // Logika Status untuk AJAX
+                $stok = (int)$prod['stok_saat_ini'];
+                $min = (int)$prod['stok_minimum'];
+                $statusBadge = '';
+                
+                if ($stok == 0) {
+                    $statusBadge = '<span style="background:#dc3545; color:white; padding:3px 8px; border-radius:4px; font-size:0.8em;">Habis</span>';
+                } elseif ($stok <= $min) {
+                    $statusBadge = '<span style="background:#ffc107; color:black; padding:3px 8px; border-radius:4px; font-size:0.8em;">Menipis</span>';
+                } else {
+                    $statusBadge = '<span style="background:#28a745; color:white; padding:3px 8px; border-radius:4px; font-size:0.8em;">Aman</span>';
+                }
+
                 $html .= '<tr>';
                 $html .= '<td style="text-align:center;">
-                            <input type="checkbox" class="row-checkbox" value="'.$prod['product_id'].'" style="transform: scale(1.2);">
+                            <input type="checkbox" class="barang-checkbox" value="'.$prod['product_id'].'" style="transform: scale(1.2); cursor: pointer;">
                           </td>';
                 $html .= '<td>' . htmlspecialchars($prod['kode_barang']) . '</td>';
                 $html .= '<td>' . htmlspecialchars($prod['nama_barang']) . '</td>';
                 $html .= '<td>' . htmlspecialchars($prod['nama_kategori']) . '</td>';
                 $html .= '<td>' . htmlspecialchars($prod['nama_merek']) . '</td>';
-                $html .= '<td><strong>' . (int)$prod['stok_saat_ini'] . '</strong></td>';
+                $html .= '<td><strong>' . $stok . '</strong></td>';
                 $html .= '<td>' . htmlspecialchars($prod['nama_satuan']) . '</td>';
                 $html .= '<td>' . htmlspecialchars($prod['stok_minimum']) . '</td>';
+                $html .= '<td>' . $statusBadge . '</td>'; // Tambahkan Kolom Status di AJAX
                 $html .= '<td>' . htmlspecialchars($prod['kode_lokasi']) . '</td>';
                 $html .= '<td>
                             <a href="'.$editUrl.'" class="btn btn-warning btn-sm">Edit</a>
@@ -1247,31 +1272,30 @@ exit;
         }
 
         echo json_encode(['html' => $html, 'totalPages' => $totalPages]);
-        exit; // PENTING: Stop script PHP di sini
+        exit; 
     }
 
-    // 4. Jika bukan AJAX, load View seperti biasa (Kode Lama)
-    $data = [
-        'judul' => 'Manajemen Barang',
-        'products' => $paginatedProducts,
-        'totalPages' => $totalPages,
-        'currentPage' => $page,
-        'search' => $search,
-        // ... (sisa data filter lainnya sama) ...
-        'kategori_filter' => $kategori,
-        'merek_filter' => $merek,
-        'status_filter' => $status,
-        'satuan_filter' => $satuan,
-        'lokasi_filter' => $lokasi,
-        'allKategori' => $this->model('Kategori_model')->getAllKategori(),
-        'allMerek' => $this->model('Merek_model')->getAllMerek(),
-        'allStatus' => $this->model('Status_model')->getAllStatus(),
-        'allSatuan' => $this->model('Satuan_model')->getAllSatuan(),
-        'allLokasi' => $this->model('Lokasi_model')->getAllLokasi()
-    ];
-    
-    $this->view('admin/manage_barang', $data);
-}
+        // 4. View Normal
+        $data = [
+            'judul' => 'Manajemen Barang',
+            'products' => $paginatedProducts,
+            'totalPages' => $totalPages,
+            'currentPage' => $page,
+            'search' => $search,
+            'kategori_filter' => $kategori,
+            'merek_filter' => $merek,
+            'status_filter' => $status,
+            'satuan_filter' => $satuan,
+            'lokasi_filter' => $lokasi,
+            'allKategori' => $this->model('Kategori_model')->getAllKategori(),
+            'allMerek' => $this->model('Merek_model')->getAllMerek(),
+            'allStatus' => $this->model('Status_model')->getAllStatus(),
+            'allSatuan' => $this->model('Satuan_model')->getAllSatuan(),
+            'allLokasi' => $this->model('Lokasi_model')->getAllLokasi()
+        ];
+        
+        $this->view('admin/manage_barang', $data);
+    }
 
     /**
      * Menampilkan halaman form tambah barang
@@ -1407,188 +1431,359 @@ exit;
         header('Location: ' . BASE_URL . 'admin/barang');
         exit;
     }
-    /*
-    |--------------------------------------------------------------------------
-    | METODE UNTUK RIWAYAT TRANSAKSI (ADMIN VIEW)
-    |--------------------------------------------------------------------------
-    */
-
-    /**
-     * Menampilkan halaman Riwayat Barang Masuk (VERSI SIMPLE)
-     */
     public function riwayatBarangMasuk($page = 1) {
         $search = $_GET['search'] ?? '';
-        // $supplier = $_GET['supplier'] ?? ''; // DIHAPUS
-        $limit = 50;
-
+        // Tangkap filter tanggal
+        $startDate = $_GET['start_date'] ?? '';
+        $endDate = $_GET['end_date'] ?? '';
+        
+        $limit = 20;
         $page = (int)$page;
         if ($page < 1) $page = 1;
 
         $transactionModel = $this->model('Transaction_model');
         
-        // Panggil model HANYA dengan search
-        $totalHistory = $transactionModel->getTotalRiwayatMasukCount($search);
+        // Kirim tanggal ke Model
+        $totalHistory = $transactionModel->getTotalRiwayatMasukCount($search, $startDate, $endDate);
         $totalPages = ceil($totalHistory / $limit);
         $offset = ($page - 1) * $limit;
-        $paginatedHistory = $transactionModel->getRiwayatMasukPaginated($limit, $offset, $search);
+        $paginatedHistory = $transactionModel->getRiwayatMasukPaginated($limit, $offset, $search, $startDate, $endDate);
 
-        // Hapus panggilan ke Supplier_model
-        // $allSuppliers = $this->model('Supplier_model')->getAllSuppliers();
+        if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
+            header('Content-Type: application/json');
+            
+            $html = '';
+            if (empty($paginatedHistory)) {
+                $html = '<tr><td colspan="9" style="text-align:center;">Data tidak ditemukan.</td></tr>';
+            } else {
+                foreach ($paginatedHistory as $his) {
+                    $buktiHtml = '-';
+                    if($his['bukti_foto']) {
+                        $urlBukti = BASE_URL . 'uploads/bukti_transaksi/' . $his['bukti_foto'];
+                        $buktiHtml = '<a href="'.$urlBukti.'" target="_blank" class="btn btn-primary btn-sm">Lihat</a>';
+                    }
+                    
+                    $tglExp = $his['exp_date'] ? date('d-m-Y', strtotime($his['exp_date'])) : '-';
+                    $tglInput = date('d-m-Y H:i', strtotime($his['created_at']));
+
+                    $html .= '<tr>';
+                    $html .= '<td>' . $tglInput . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['nama_barang']) . '</td>';
+                    $html .= '<td><strong>' . (int)$his['jumlah'] . '</strong></td>';
+                    $html .= '<td>' . htmlspecialchars($his['nama_satuan']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['nama_supplier']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['staff_nama']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['lot_number']) . '</td>';
+                    $html .= '<td>' . $tglExp . '</td>';
+                    $html .= '<td>' . $buktiHtml . '</td>';
+                    $html .= '</tr>';
+                }
+            }
+
+            echo json_encode(['html' => $html, 'totalPages' => $totalPages, 'currentPage' => $page]);
+            exit; 
+        }
 
         $data = [
             'judul' => 'Riwayat Barang Masuk',
             'history' => $paginatedHistory,
             'totalPages' => $totalPages,
             'currentPage' => $page,
-            'search' => $search
-            // 'supplier_filter' => $supplier, // DIHAPUS
-            // 'allSuppliers' => $allSuppliers // DIHAPUS
+            'search' => $search,
+            'start_date' => $startDate, // Kirim balik ke View
+            'end_date' => $endDate      // Kirim balik ke View
         ];
         
         $this->view('admin/history_barang_masuk', $data);
     }
+
     /**
-     * Menampilkan halaman Riwayat Barang Keluar (VERSI SIMPLE)
+     * Menampilkan halaman Riwayat Barang Keluar (AJAX SUPPORT)
      */
     public function riwayatBarangKeluar($page = 1) {
         $search = $_GET['search'] ?? '';
-        // $staff = $_GET['staff'] ?? ''; // DIHAPUS
-        $limit = 50;
+        // TANGKAP DATE FILTER
+        $startDate = $_GET['start_date'] ?? '';
+        $endDate = $_GET['end_date'] ?? '';
 
+        $limit = 20;
         $page = (int)$page;
         if ($page < 1) $page = 1;
 
         $transactionModel = $this->model('Transaction_model');
         
-        // Panggil model HANYA dengan search
-        $totalHistory = $transactionModel->getTotalRiwayatKeluarCount($search);
+        // KIRIM DATE FILTER KE MODEL
+        $totalHistory = $transactionModel->getTotalRiwayatKeluarCount($search, $startDate, $endDate);
         $totalPages = ceil($totalHistory / $limit);
         $offset = ($page - 1) * $limit;
-        $paginatedHistory = $transactionModel->getRiwayatKeluarPaginated($limit, $offset, $search);
+        $paginatedHistory = $transactionModel->getRiwayatKeluarPaginated($limit, $offset, $search, $startDate, $endDate);
 
-        // Hapus panggilan ke User_model
-        // $allStaff = $this->model('User_model')->getUsersByRole('staff');
+        if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
+            header('Content-Type: application/json');
+            $html = '';
+            if (empty($paginatedHistory)) {
+                $html = '<tr><td colspan="7" style="text-align:center;">Data tidak ditemukan.</td></tr>';
+            } else {
+                foreach ($paginatedHistory as $his) {
+                    $tglInput = date('d-m-Y H:i', strtotime($his['created_at']));
+                    $html .= '<tr>';
+                    $html .= '<td>' . $tglInput . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['nama_barang']) . '</td>';
+                    $html .= '<td><strong>' . (int)$his['jumlah'] . '</strong></td>';
+                    $html .= '<td>' . htmlspecialchars($his['nama_satuan']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['keterangan']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['staff_nama']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['lot_number']) . '</td>';
+                    $html .= '</tr>';
+                }
+            }
+            echo json_encode(['html' => $html, 'totalPages' => $totalPages, 'currentPage' => $page]);
+            exit; 
+        }
 
         $data = [
             'judul' => 'Riwayat Barang Keluar',
             'history' => $paginatedHistory,
             'totalPages' => $totalPages,
             'currentPage' => $page,
-            'search' => $search
-            // 'staff_filter' => $staff, // DIHAPUS
-            // 'allStaff' => $allStaff // DIHAPUS
+            'search' => $search,
+            'start_date' => $startDate, // KIRIM BALIK KE VIEW
+            'end_date' => $endDate      // KIRIM BALIK KE VIEW
         ];
         
         $this->view('admin/history_barang_keluar', $data);
     }
+
     /**
-     * Menampilkan halaman Riwayat Retur / Barang Rusak
+     * Menampilkan halaman Riwayat Retur / Barang Rusak (AJAX SUPPORT)
      */
     public function riwayatReturRusak($page = 1) {
         $search = $_GET['search'] ?? '';
-        $limit = 50;
+        $startDate = $_GET['start_date'] ?? '';
+        $endDate = $_GET['end_date'] ?? '';
 
+        $limit = 20; 
         $page = (int)$page;
         if ($page < 1) $page = 1;
 
         $transactionModel = $this->model('Transaction_model');
         
-        $totalHistory = $transactionModel->getTotalRiwayatReturCount($search);
+        $totalHistory = $transactionModel->getTotalRiwayatReturCount($search, $startDate, $endDate);
         $totalPages = ceil($totalHistory / $limit);
         $offset = ($page - 1) * $limit;
-        $paginatedHistory = $transactionModel->getRiwayatReturPaginated($limit, $offset, $search);
+        $paginatedHistory = $transactionModel->getRiwayatReturPaginated($limit, $offset, $search, $startDate, $endDate);
+
+        if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
+            header('Content-Type: application/json');
+            $html = '';
+            if (empty($paginatedHistory)) {
+                $html = '<tr><td colspan="7" style="text-align:center;">Data tidak ditemukan.</td></tr>';
+            } else {
+                foreach ($paginatedHistory as $his) {
+                    $tglLapor = date('d-m-Y H:i', strtotime($his['created_at']));
+                    $html .= '<tr>';
+                    $html .= '<td>' . $tglLapor . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['nama_barang']) . '</td>';
+                    $html .= '<td><strong>' . (int)$his['jumlah'] . '</strong></td>';
+                    $html .= '<td>' . htmlspecialchars($his['nama_status']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['keterangan']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['staff_nama']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['lot_number']) . '</td>';
+                    $html .= '</tr>';
+                }
+            }
+            echo json_encode(['html' => $html, 'totalPages' => $totalPages, 'currentPage' => $page]);
+            exit; 
+        }
 
         $data = [
             'judul' => 'Riwayat Retur/Rusak',
             'history' => $paginatedHistory,
             'totalPages' => $totalPages,
             'currentPage' => $page,
-            'search' => $search
+            'search' => $search,
+            'start_date' => $startDate,
+            'end_date' => $endDate
         ];
         
         $this->view('admin/history_retur_rusak', $data);
     }
+
     /**
-     * Menampilkan halaman Riwayat Peminjaman (Admin View)
+     * Menampilkan halaman Riwayat Peminjaman (AJAX SUPPORT)
      */
     public function riwayatPeminjaman($page = 1) {
         $search = $_GET['search'] ?? '';
-        $status = $_GET['status'] ?? ''; // Filter per Status
-        $limit = 50;
+        $status = $_GET['status'] ?? ''; 
+        $startDate = $_GET['start_date'] ?? '';
+        $endDate = $_GET['end_date'] ?? '';
 
+        $limit = 20; 
         $page = (int)$page;
         if ($page < 1) $page = 1;
 
         $loanModel = $this->model('Loan_model');
         
-        $totalHistory = $loanModel->getTotalRiwayatPeminjamanCount($search, $status);
+        $totalHistory = $loanModel->getTotalRiwayatPeminjamanCount($search, $status, $startDate, $endDate);
         $totalPages = ceil($totalHistory / $limit);
         $offset = ($page - 1) * $limit;
-        $paginatedHistory = $loanModel->getRiwayatPeminjamanPaginated($limit, $offset, $search, $status);
+        $paginatedHistory = $loanModel->getRiwayatPeminjamanPaginated($limit, $offset, $search, $status, $startDate, $endDate);
+
+        if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
+            header('Content-Type: application/json');
+            $html = '';
+            if (empty($paginatedHistory)) {
+                $html = '<tr><td colspan="7" style="text-align:center;">Data tidak ditemukan.</td></tr>';
+            } else {
+                foreach ($paginatedHistory as $his) {
+                    $tglAjuan = date('d-m-Y H:i', strtotime($his['tgl_pengajuan']));
+                    $tglPinjam = date('d-m-Y', strtotime($his['tgl_rencana_pinjam']));
+                    $tglKembali = date('d-m-Y', strtotime($his['tgl_rencana_kembali']));
+                    $staff = $his['nama_staff'] ?? '-';
+
+                    $html .= '<tr>';
+                    $html .= '<td>' . $tglAjuan . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['nama_peminjam']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['nama_barang']) . '</td>';
+                    $html .= '<td>' . $tglPinjam . '</td>';
+                    $html .= '<td>' . $tglKembali . '</td>';
+                    $html .= '<td>' . htmlspecialchars($his['status_pinjam']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($staff) . '</td>';
+                    $html .= '</tr>';
+                }
+            }
+            echo json_encode(['html' => $html, 'totalPages' => $totalPages, 'currentPage' => $page]);
+            exit; 
+        }
 
         $data = [
             'judul' => 'Riwayat Peminjaman',
             'history' => $paginatedHistory,
             'totalPages' => $totalPages,
             'currentPage' => $page,
-            // Data untuk filter
             'search' => $search,
-            'status_filter' => $status
-            // Status ENUM kita hardcode di view
+            'status_filter' => $status,
+            'start_date' => $startDate,
+            'end_date' => $endDate
         ];
         
         $this->view('admin/history_peminjaman', $data);
     }
+    
     /*
     |--------------------------------------------------------------------------
     | METODE UNTUK OPERASI Kritis STOCK OPNAME (ADMIN)
     |--------------------------------------------------------------------------
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | METODE UNTUK OPERASI Kritis STOCK OPNAME (ADMIN) - V2 (DELEGASI)
+    |--------------------------------------------------------------------------
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | METODE UNTUK OPERASI Kritis STOCK OPNAME (ADMIN) - V2 (TERPISAH)
+    |--------------------------------------------------------------------------
+    */
+
     /**
-     * Menampilkan Control Panel Stock Opname (2 State View)
+     * Halaman 1: Perintah Opname (Buat Baru & Monitoring)
      */
-    public function stockOpname() {
+    public function perintahOpname() {
         $opnameModel = $this->model('Opname_model');
         $activePeriod = $opnameModel->getActivePeriod();
         
         $data = [
-            'judul' => 'Stock Opname / Penyesuaian Stok',
+            'judul' => 'Perintah Opname',
             'activePeriod' => $activePeriod,
-            'completedPeriods' => $opnameModel->getCompletedPeriods(10), // Ambil 10 riwayat terakhir
-            'reconciliationReport' => null
+            'reconciliationReport' => null,
+            'allKategori' => [],
+            'taskProgress' => []
         ];
 
-        // Jika user meminta Laporan Rekonsiliasi (State 3)
-        if (isset($_GET['view_report']) && $activePeriod) {
-            $data['reconciliationReport'] = $opnameModel->getReconciliationReport($activePeriod['period_id']);
+        // Jika BELUM ADA opname aktif -> Siapkan data untuk Form Buat Baru
+        if (!$activePeriod) {
+            $data['allKategori'] = $this->model('Kategori_model')->getAllKategori();
+        } 
+        // Jika SUDAH ADA opname aktif -> Siapkan data Monitoring
+        else {
+            $data['taskProgress'] = $opnameModel->getTaskProgress($activePeriod['period_id']);
+            
+            // Jika mode Laporan Rekonsiliasi
+            if (isset($_GET['view_report'])) {
+                $data['reconciliationReport'] = $opnameModel->getReconciliationReport($activePeriod['period_id']);
+            }
         }
 
-        $this->view('admin/manage_opname', $data);
+        $this->view('admin/opname_perintah', $data);
+    }
+
+    
+    /**
+     * Halaman 2: Riwayat / Arsip Opname
+     */
+    public function riwayatOpname($page = 1) {
+        $opnameModel = $this->model('Opname_model');
+        
+        // Logika Paginasi Sederhana (Bisa dikembangkan nanti)
+        $limit = 20;
+        
+        $data = [
+            'judul' => 'Riwayat Opname',
+            'completedPeriods' => $opnameModel->getCompletedPeriods($limit) 
+        ];
+
+        $this->view('admin/opname_riwayat', $data);
     }
     
     /**
-     * [AKSI] Memulai periode Stock Opname baru.
+     * [AKSI] Membuat Surat Perintah Opname
      */
     public function startNewOpname() {
+        if ($_SERVER['REQUEST_METHOD'] != 'POST') {
+            header('Location: ' . BASE_URL . 'admin/perintahOpname');
+            exit;
+        }
+
+        $scope = 'ALL';
+        if (isset($_POST['kategori_ids'])) {
+            if (in_array('ALL', $_POST['kategori_ids'])) {
+                $scope = 'ALL';
+            } else {
+                $scope = implode(',', $_POST['kategori_ids']);
+            }
+        }
+
+        $data = [
+            'user_id' => $_SESSION['user_id'],
+            'nomor_sp' => $_POST['nomor_sp'],
+            'target_selesai' => !empty($_POST['target_selesai']) ? $_POST['target_selesai'] : null,
+            'catatan_admin' => $_POST['catatan_admin'],
+            'scope_kategori' => $scope
+        ];
+
         $opnameModel = $this->model('Opname_model');
         
-        if ($opnameModel->startNewPeriod($_SESSION['user_id'])) {
-            $_SESSION['flash_message'] = ['text' => 'Periode Stock Opname baru berhasil dimulai. Staff dapat mulai menghitung.', 'type' => 'success'];
-        } else {
-            $_SESSION['flash_message'] = ['text' => 'Gagal: Sudah ada periode Opname yang aktif.', 'type' => 'error'];
+        try {
+            $opnameModel->createOpnameCommand($data);
+            $_SESSION['flash_message'] = ['text' => 'Surat Perintah Opname berhasil dibuat.', 'type' => 'success'];
+        } catch (Exception $e) {
+            $_SESSION['flash_message'] = ['text' => 'Gagal: ' . $e->getMessage(), 'type' => 'error'];
         }
         
-        header('Location: ' . BASE_URL . 'admin/stockOpname');
+        // Redirect kembali ke halaman Perintah
+        header('Location: ' . BASE_URL . 'admin/perintahOpname');
         exit;
     }
 
     /**
-     * [AKSI] Finalisasi dan Penyesuaian Stok (Langkah Paling Kritis)
+     * [AKSI] Finalisasi Opname
      */
     public function finalizeOpname() {
         if ($_SERVER['REQUEST_METHOD'] != 'POST') {
-            header('Location: ' . BASE_URL . 'admin/stockOpname');
+            header('Location: ' . BASE_URL . 'admin/perintahOpname');
             exit;
         }
         
@@ -1597,16 +1792,15 @@ exit;
         
         if (!$activePeriod) {
             $_SESSION['flash_message'] = ['text' => 'Gagal: Tidak ada periode Opname yang aktif.', 'type' => 'error'];
-            header('Location: ' . BASE_URL . 'admin/stockOpname');
+            header('Location: ' . BASE_URL . 'admin/perintahOpname');
             exit;
         }
 
-        // Ambil data penyesuaian dari form
-        $adjustments = $_POST['adjustment']; // Ini akan jadi array [product_id => selisih]
+        $adjustments = $_POST['adjustment'] ?? []; 
 
         try {
             foreach ($adjustments as $product_id => $selisih) {
-                if ($selisih != 0) { // Hanya proses jika ada selisih
+                if ($selisih != 0) { 
                     $opnameModel->processAdjustment(
                         $product_id, 
                         (int)$selisih, 
@@ -1616,18 +1810,19 @@ exit;
                 }
             }
 
-            // 3. TUTUP PERIODE OPNAME
             $opnameModel->closeActivePeriod($activePeriod['period_id'], $_SESSION['user_id']);
             
-            $_SESSION['flash_message'] = ['text' => 'Stock Opname Selesai. Penyesuaian stok berhasil dicatat.', 'type' => 'success'];
+            $_SESSION['flash_message'] = ['text' => 'Stock Opname Selesai & Ditutup. Cek di menu Riwayat.', 'type' => 'success'];
 
         } catch (Exception $e) {
             $_SESSION['flash_message'] = ['text' => 'Finalisasi Gagal: ' . $e->getMessage(), 'type' => 'error'];
         }
         
-        header('Location: ' . BASE_URL . 'admin/stockOpname');
+        // Redirect ke Riwayat setelah selesai
+        header('Location: ' . BASE_URL . 'admin/riwayatOpname');
         exit;
     }
+
     /*
     |--------------------------------------------------------------------------
     | METODE UNTUK MENU LAPORAN & PENGAWASAN (ADMIN)
@@ -2202,5 +2397,46 @@ public function processCheckOut() {
         }
     }
 
+    /**
+     * [AJAX] Endpoint untuk melihat detail barang per kategori
+     */
+    public function getCategoryDetails($kategori_id) {
+        // Pastikan ID ada
+        if (!isset($kategori_id)) exit;
+
+        $products = $this->model('Product_model')->getProductsByCategoryId($kategori_id);
+
+        header('Content-Type: application/json');
+        echo json_encode($products);
+        exit;
+    }
+
+    /**
+     * Halaman Detail Arsip Opname (Laporan Lengkap)
+     */
+    public function detailRiwayatOpname($periodId) {
+        $opnameModel = $this->model('Opname_model');
+        
+        // 1. Ambil Info Header SP
+        $periodDetail = $opnameModel->getPeriodDetailById($periodId);
+        
+        if (!$periodDetail) {
+            $_SESSION['flash_message'] = ['text' => 'Data opname tidak ditemukan.', 'type' => 'error'];
+            header('Location: ' . BASE_URL . 'admin/riwayatOpname');
+            exit;
+        }
+
+        // 2. Siapkan Data
+        $data = [
+            'judul' => 'Laporan Detail Stock Opname',
+            'period' => $periodDetail,
+            // Siapa mengerjakan apa
+            'participants' => $opnameModel->getParticipantDetails($periodId), 
+            // Apa hasil hitungannya
+            'logs' => $opnameModel->getOpnameLogsDetail($periodId) 
+        ];
+
+        $this->view('admin/opname_riwayat_detail', $data);
+    }
 
 }

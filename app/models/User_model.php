@@ -231,20 +231,24 @@ class User_model extends Model {
     }
 
     /**
-     * Mengimpor pengguna via CSV.
+     * Mengimpor pengguna via CSV (VERSI SMART: Skip Duplikat)
+     * Tidak membatalkan semua jika ada satu yang gagal.
      */
     public function importUsers($users) {
-        $successCount = 0;
-        
-        try {
-            $this->db->beginTransaction();
+        $summary = [
+            'success' => 0,
+            'skipped' => 0,
+            'errors'  => 0,
+            'skipped_list' => [] // Menyimpan email yang duplikat
+        ];
 
-            // Query INSERT
-            $this->query("INSERT INTO users (nama_lengkap, email, password, role) 
-                          VALUES (:nama_lengkap, :email, :password, :role)");
+        // Query disiapkan sekali di luar loop agar efisien
+        $this->query("INSERT INTO users (nama_lengkap, email, password, role) 
+                      VALUES (:nama_lengkap, :email, :password, :role)");
 
-            foreach ($users as $user) {
-                // Hash password sesuai yang ada di CSV
+        foreach ($users as $user) {
+            try {
+                // Hash password
                 $hashedPassword = password_hash($user['password'], PASSWORD_DEFAULT);
 
                 $this->bind('nama_lengkap', $user['nama_lengkap']);
@@ -252,38 +256,25 @@ class User_model extends Model {
                 $this->bind('password', $hashedPassword);
                 $this->bind('role', $user['role']);
                 
-                $this->execute(); // Eksekusi per baris
-                $successCount++;
+                // Coba Eksekusi per satu baris
+                $this->execute();
+                $summary['success']++; // Jika berhasil, tambah counter sukses
+
+            } catch (PDOException $e) {
+                // Cek Kode Error 1062 (Duplicate Entry / Email Kembar)
+                if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
+                    // Jangan hentikan proses, cukup catat sebagai 'skipped'
+                    $summary['skipped']++;
+                    $summary['skipped_list'][] = $user['email'];
+                } else {
+                    // Error lain (misal koneksi putus), catat error
+                    $summary['errors']++;
+                }
             }
-
-            $this->db->commit();
-            return ['success' => $successCount, 'fail' => 0];
-
-        } catch (PDOException $e) {
-            $this->db->rollBack();
-            
-            // --- PERBAIKAN PESAN ERROR DISINI ---
-            
-            // Cek Kode Error 1062 (Duplicate Entry / Data Kembar)
-            if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
-                
-                // Pesan error asli MySQL biasanya: "Duplicate entry 'budi@test.com' for key 'email'"
-                // Kita ambil teks emailnya menggunakan Regex agar rapi
-                preg_match("/Duplicate entry '(.*?)' for key/", $e->getMessage(), $matches);
-                $duplicateData = isset($matches[1]) ? $matches[1] : 'Data';
-
-                return [
-                    'error' => "Gagal Import! Data '$duplicateData' sudah terdaftar di sistem (Duplikat)."
-                ];
-            }
-
-            // Jika error lain, tampilkan pesan umum
-            return ['error' => "Terjadi kesalahan database sistem."];
-            
-        } catch (Exception $e) {
-            $this->db->rollBack();
-            return ['error' => "Terjadi kesalahan sistem: " . $e->getMessage()];
         }
+
+        // Kembalikan laporan lengkap ke Controller
+        return $summary;
     }
 
     /**
@@ -299,9 +290,10 @@ class User_model extends Model {
     }
 
     /**
-     * Update profil user.
+     * Update profil user (FIXED: Eksekusi query profil sebelum query user)
      */
     public function updateProfile($data) {
+        // 1. QUERY PERTAMA: Update Tabel Profil (Foto, Alamat, dll)
         $this->query("INSERT INTO user_profiles 
                         (user_id, foto_profil, tempat_lahir, tanggal_lahir, agama, telepon, alamat, kota, provinsi, kode_pos)
                       VALUES 
@@ -328,11 +320,16 @@ class User_model extends Model {
         $this->bind('provinsi', $data['provinsi']);
         $this->bind('kode_pos', $data['kode_pos']);
 
+        // --- INI YANG SEBELUMNYA HILANG! ---
+        // Kita harus eksekusi query profil dulu sebelum menyiapkan query nama.
+        $this->execute(); 
+        // -----------------------------------
+
+        // 2. QUERY KEDUA: Update Tabel Users (Nama Lengkap)
         $this->query("UPDATE users SET nama_lengkap = :nama_lengkap WHERE user_id = :user_id");
         $this->bind('nama_lengkap', $data['nama_lengkap']);
         $this->bind('user_id', $data['user_id'], PDO::PARAM_INT);
-        $this->execute(); 
-
+        
         return $this->execute(); 
     }
 

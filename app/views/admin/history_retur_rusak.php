@@ -4,26 +4,41 @@
 ?>
 
 <main class="app-content">
-    <?php
-        // Blok Notifikasi
-        if(isset($_SESSION['flash_message'])) {
-            $flash = $_SESSION['flash_message'];
-            echo '<div class="flash-message ' . $flash['type'] . '">' . $flash['text'] . '</div>';
-            unset($_SESSION['flash_message']);
-        }
-    ?>
+    
     <div class="content-header">
         <h1>Riwayat Retur / Barang Rusak</h1>
     </div>
 
-    <div class="search-container">
-        <form action="<?php echo BASE_URL; ?>admin/riwayatReturRusak" method="GET">
-            <input type="text" name="search" class="search-input" 
-                   placeholder="Cari Tgl, Barang, Status, Staff, atau Lot..." 
-                   value="<?php echo htmlspecialchars($data['search']); ?>">
+    <div class="search-container" style="padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px;">
+        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
             
-            <button type="submit" class="btn btn-primary">Cari</button>
-        </form>
+            <div style="flex: 2; min-width: 250px;">
+                <label style="font-weight:bold; font-size:0.85em; color:#666; display:block; margin-bottom:5px;">Pencarian Universal:</label>
+                <input type="text" id="liveSearchRetur" class="form-control" 
+                       placeholder="🔍 Cari Barang, Status, Keterangan..." 
+                       value="<?php echo htmlspecialchars($data['search']); ?>"
+                       data-base-url="<?php echo BASE_URL; ?>"
+                       style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+            </div>
+
+            <div style="flex: 1; min-width: 130px;">
+                <label for="startDateRetur" style="font-weight:bold; font-size:0.85em; color:#666; display:block; margin-bottom:5px;">Dari Tanggal:</label>
+                <input type="date" id="startDateRetur" class="form-control" 
+                       value="<?php echo htmlspecialchars($data['start_date'] ?? ''); ?>"
+                       style="width: 100%; padding: 9px; border: 1px solid #ccc; border-radius: 5px;">
+            </div>
+
+            <div style="flex: 1; min-width: 130px;">
+                <label for="endDateRetur" style="font-weight:bold; font-size:0.85em; color:#666; display:block; margin-bottom:5px;">Sampai Tanggal:</label>
+                <input type="date" id="endDateRetur" class="form-control" 
+                       value="<?php echo htmlspecialchars($data['end_date'] ?? ''); ?>"
+                       style="width: 100%; padding: 9px; border: 1px solid #ccc; border-radius: 5px;">
+            </div>
+
+            <div>
+                <a href="<?php echo BASE_URL; ?>admin/riwayatReturRusak" class="btn btn-danger" style="padding: 10px 15px; height: 42px; display: flex; align-items: center;" title="Reset">↻</a>
+            </div>
+        </div>
     </div>
 
     <div class="content-table">
@@ -35,50 +50,56 @@
                     <th>Jumlah</th>
                     <th>Status Baru</th>
                     <th>Asal / Keterangan</th>
-                    <th>Dilaporkan oleh (Staff)</th>
+                    <th>Dilaporkan oleh</th>
                     <th>Lot/Batch</th>
                 </tr>
             </thead>
-            <tbody>
-                <?php foreach ($data['history'] as $his) : ?>
-                <tr>
-                    <td><?php echo date('d-m-Y H:i', strtotime($his['created_at'])); ?></td>
-                    <td><?php echo htmlspecialchars($his['nama_barang']); ?></td>
-                    <td><strong><?php echo (int)$his['jumlah']; ?></strong></td> 
-                    <td><?php echo htmlspecialchars($his['nama_status']); ?></td>
-                    <td><?php echo htmlspecialchars($his['keterangan']); ?></td>
-                    <td><?php echo htmlspecialchars($his['staff_nama']); ?></td>
-                    <td><?php echo htmlspecialchars($his['lot_number']); ?></td>
-                </tr>
-                <?php endforeach; ?>
+            <tbody id="tableBodyRetur">
+                <?php if (empty($data['history'])): ?>
+                    <tr><td colspan="7" style="text-align:center;">Data tidak ditemukan.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($data['history'] as $his) : ?>
+                    <tr>
+                        <td><?php echo date('d-m-Y H:i', strtotime($his['created_at'])); ?></td>
+                        <td><?php echo htmlspecialchars($his['nama_barang']); ?></td>
+                        <td><strong><?php echo (int)$his['jumlah']; ?></strong></td> 
+                        <td><?php echo htmlspecialchars($his['nama_status']); ?></td>
+                        <td><?php echo htmlspecialchars($his['keterangan']); ?></td>
+                        <td><?php echo htmlspecialchars($his['staff_nama']); ?></td>
+                        <td><?php echo htmlspecialchars($his['lot_number']); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <div class="pagination-container">
+    <div class="pagination-container" id="paginationContainerRetur">
         <nav>
             <ul class="pagination">
                 <?php
                     $currentPage = $data['currentPage'];
                     $totalPages = $data['totalPages'];
-                    $filterQuery = !empty($data['search']) ? '?search=' . urlencode($data['search']) : '';
+                    
+                    $prevDisabled = ($currentPage <= 1) ? 'disabled' : '';
+                    echo '<li class="page-item '.$prevDisabled.'"><a class="page-link" href="#" data-page="'.($currentPage - 1).'">Previous</a></li>';
+                    
+                    if($totalPages > 0) {
+                        $start = max(1, $currentPage - 2);
+                        $end = min($totalPages, $currentPage + 2);
+                        for ($i = $start; $i <= $end; $i++) {
+                            $active = ($i == $currentPage) ? 'active' : '';
+                            echo '<li class="page-item '.$active.'"><a class="page-link" href="#" data-page="'.$i.'">'.$i.'</a></li>';
+                        }
+                    }
+
+                    $nextDisabled = ($currentPage >= $totalPages) ? 'disabled' : '';
+                    echo '<li class="page-item '.$nextDisabled.'"><a class="page-link" href="#" data-page="'.($currentPage + 1).'">Next</a></li>';
                 ?>
-                <?php if ($currentPage > 1) : ?>
-                    <li class="page-item"><a class="page-link" href="<?php echo BASE_URL; ?>admin/riwayatReturRusak/<?php echo $currentPage - 1; ?><?php echo $filterQuery; ?>">Previous</a></li>
-                <?php else : ?>
-                    <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
-                <?php endif; ?>
-                <?php for ($i = 1; $i <= $totalPages; $i++) : ?>
-                    <li class="page-item <?php echo ($i == $currentPage) ? 'active' : ''; ?>"><a class="page-link" href="<?php echo BASE_URL; ?>admin/riwayatReturRusak/<?php echo $i; ?><?php echo $filterQuery; ?>"><?php echo $i; ?></a></li>
-                <?php endfor; ?>
-                <?php if ($currentPage < $totalPages) : ?>
-                    <li class="page-item"><a class="page-link" href="<?php echo BASE_URL; ?>admin/riwayatReturRusak/<?php echo $currentPage + 1; ?><?php echo $filterQuery; ?>">Next</a></li>
-                <?php else : ?>
-                    <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
-                <?php endif; ?>
             </ul>
         </nav>
     </div>
+
 </main>
 
 <?php
