@@ -138,33 +138,60 @@ class PemilikController extends Controller {
         // 6. Panggil view baru (yang akan kita buat)
         $this->view('pemilik/report_stok', $data);
     }
+
     /**
-     * Menampilkan Halaman Laporan Transaksi (dengan TAB)
+     * Menampilkan Halaman Laporan Transaksi (LENGKAP: History + Analitik)
      */
     public function laporanTransaksi() {
-        // Panggil model yang relevan
         $transModel = $this->model('Transaction_model');
         
-        // Kita ambil 50 data terakhir untuk setiap tab
+        // --- BAGIAN 1: DATA TAB RIWAYAT ---
         $limit = 50;
         $offset = 0;
-        $search = ''; // Pemilik bisa melihat semua
+        $search = ''; 
+
+        // --- BAGIAN 2: DATA TAB ANALITIK ---
+        $fastMoving = $transModel->getFastMovingItems(5);
+        $slowMoving = $transModel->getSlowMovingItems(5);
+        
+        // Ambil Data Grafik Bulanan
+        $grafikDataRaw = $transModel->getGrafikBulanan();
+        
+        // Format untuk Chart.js
+        $grafikLabels = [];
+        $grafikMasuk = [];
+        $grafikKeluar = [];
+        
+        foreach ($grafikDataRaw as $row) {
+            $grafikLabels[] = date('M Y', strtotime($row['bulan'] . '-01'));
+            $grafikMasuk[] = $row['total_masuk'];
+            $grafikKeluar[] = $row['total_keluar'];
+        }
 
         $data = [
             'judul' => 'Laporan Transaksi',
             
-            // Ambil data untuk setiap TAB
-            'riwayat_masuk' => $transModel->getRiwayatMasukPaginated($limit, $offset, $search),
+            'riwayat_masuk'  => $transModel->getRiwayatMasukPaginated($limit, $offset, $search),
             'riwayat_keluar' => $transModel->getRiwayatKeluarPaginated($limit, $offset, $search),
-            'riwayat_rusak' => $transModel->getRiwayatReturPaginated($limit, $offset, $search),
+            'riwayat_rusak'  => $transModel->getRiwayatReturPaginated($limit, $offset, $search),
             
-            // (Kita akan tambahkan data untuk TAB Analitik nanti)
-            'grafik_data' => [] 
+            'fast_moving' => $fastMoving,
+            'slow_moving' => $slowMoving,
+            
+            // Data untuk Chart.js
+            'grafik' => [
+                'labels' => json_encode($grafikLabels),
+                'masuk'  => json_encode($grafikMasuk),
+                'keluar' => json_encode($grafikKeluar)
+            ],
+
+            // Data mentah untuk Tabel Flow di bawah grafik
+            'grafik_raw' => $grafikDataRaw 
         ];
         
-        // Panggil view baru (yang akan kita buat)
         $this->view('pemilik/report_transaksi', $data);
     }
+    
     /**
      * Menampilkan Halaman Laporan Peminjaman (Read-Only)
      */

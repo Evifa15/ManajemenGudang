@@ -1,9 +1,6 @@
 <?php
     require_once APPROOT . '/views/templates/header.php';
     require_once APPROOT . '/views/templates/sidebar_staff.php';
-    
-    // Siapkan data JSON untuk JavaScript
-    $productsJson = json_encode($data['products']);
 ?>
 
 <main class="app-content">
@@ -42,27 +39,57 @@
             </fieldset>
 
             <fieldset>
-                <legend>Detail Barang</legend>
+                <legend>Detail Barang & Batch</legend>
+                
                 <div class="form-group">
                     <label for="product_id">Pilih Barang</label>
-                    <select id="product_id" name="product_id" required>
-                        <option value="">-- Pilih Barang --</option>
-                        <?php foreach($data['products'] as $prod): ?>
-                            <option value="<?php echo $prod['product_id']; ?>" data-lacak_lot="<?php echo $prod['lacak_lot_serial']; ?>">
-                                <?php echo $prod['kode_barang'] . ' - ' . $prod['nama_barang']; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    
+                    <div id="reader" style="width: 100%; display:none; margin-bottom:15px; border:2px solid #ccc; border-radius:5px;"></div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <select id="product_id" name="product_id" required class="form-control" style="flex: 1;">
+                            <option value="">-- Pilih Barang atau Scan --</option>
+                            <?php foreach($data['products'] as $prod): ?>
+                                <option value="<?php echo $prod['product_id']; ?>" 
+                                        data-kode="<?php echo $prod['kode_barang']; ?>"
+                                        data-lacak_lot="<?php echo $prod['lacak_lot_serial']; ?>">
+                                    <?php echo $prod['kode_barang'] . ' - ' . $prod['nama_barang']; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+
+                        <button type="button" id="btnScanBarcode" class="btn btn-info" style="background:#17a2b8; color:white; border:none;">
+                            📷 Scan
+                        </button>
+                    </div>
                 </div>
 
-                <div id="lot_tracking_fields" style="display: none;">
+                <div style="background: #e8f4fd; padding: 15px; border-radius: 5px; border: 1px solid #b8daff; margin-bottom: 15px;">
                     <div class="form-group">
-                        <label for="lot_number">Nomor Lot / Batch</label>
-                        <input type="text" id="lot_number" name="lot_number" placeholder="Misal: BATCH-001">
+                        <label for="lot_number">Nomor Lot / Batch <span style="color:red">*</span></label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="lot_number" name="lot_number" 
+                                   placeholder="Ketik manual atau klik Auto (BATCH-YYMMDD-XXX)" 
+                                   required style="flex: 1;">
+                            
+                            <button type="button" id="btnAutoBatch" class="btn btn-info" 
+                                    style="background-color: #17a2b8; border: none; color: white; padding: 0 15px;"
+                                    title="Buat Nomor Batch Otomatis">
+                                ⚡ Auto
+                            </button>
+                        </div>
+                        <small style="color:#666;">Wajib diisi. Gunakan tombol Auto untuk Batch Internal.</small>
                     </div>
-                    <div class="form-group">
-                        <label for="exp_date">Tanggal Kedaluwarsa (Opsional)</label>
-                        <input type="date" id="exp_date" name="exp_date">
+                    
+                    <div style="display: flex; gap: 15px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="production_date">Tanggal Produksi <span style="color:red">*</span></label>
+                            <input type="date" id="production_date" name="production_date" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="exp_date">Tanggal Kedaluwarsa (Expired) <span style="color:red">*</span></label>
+                            <input type="date" id="exp_date" name="exp_date" required>
+                        </div>
                     </div>
                 </div>
 
@@ -98,12 +125,23 @@
 
                 <div class="form-group">
                     <label for="keterangan">Keterangan (Opsional)</label>
-                    <textarea id="keterangan" name="keterangan" rows="3" placeholder="Misal: Dus sedikit basah"></textarea>
+                    <textarea id="keterangan" name="keterangan" rows="3" placeholder="Contoh: Dus sedikit basah"></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label for="bukti_foto">Upload Foto Nota / Surat Jalan (Opsional)</label>
-                    <input type="file" id="bukti_foto" name="bukti_foto" accept="image/png, image/jpeg, application/pdf">
+                    <label>Upload Bukti Nota / Surat Jalan (Bisa Lebih dari 1)</label>
+                    
+                    <div id="preview-container" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                        </div>
+
+                    <button type="button" id="btn-add-file" class="btn btn-info btn-sm" style="margin-bottom: 5px;">
+                        + Tambah File
+                    </button>
+                    <small style="color: #666; display: inline-block; margin-left: 10px;">Format: JPG, PNG, PDF</small>
+
+                    <input type="file" id="bukti_foto_input" accept="image/*, application/pdf" style="display: none;">
+                    
+                    <input type="file" id="bukti_foto_final" name="bukti_foto[]" multiple style="display: none;">
                 </div>
             </fieldset>
             
@@ -113,35 +151,6 @@
         </form>
     </div>
 </main>
-
-<script>
-    // Ambil data produk dari PHP
-    const productsData = <?php echo $productsJson; ?>;
-    
-    const productMap = new Map();
-    productsData.forEach(prod => {
-        // Pastikan product_id adalah string untuk pencocokan
-        productMap.set(String(prod.product_id), prod.lacak_lot_serial);
-    });
-
-    const productSelect = document.getElementById('product_id');
-    const lotFields = document.getElementById('lot_tracking_fields');
-    const lotNumberInput = document.getElementById('lot_number');
-
-    productSelect.addEventListener('change', function() {
-        const selectedProductId = this.value;
-        const lacakLot = productMap.get(selectedProductId);
-
-        if (lacakLot == "1") {
-            lotFields.style.display = 'block'; 
-            lotNumberInput.required = true;    
-        } else {
-            lotFields.style.display = 'none';  
-            lotNumberInput.required = false;   
-            lotNumberInput.value = '';         
-        }
-    });
-</script>
 
 <?php
     require_once APPROOT . '/views/templates/footer.php';

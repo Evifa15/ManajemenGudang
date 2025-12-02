@@ -111,7 +111,7 @@ class StaffController extends Controller {
     }
 
     /**
-     * Memproses data dari form barang masuk
+     * Memproses data dari form barang masuk (STRICT MODE + MULTI UPLOAD)
      */
     public function processBarangMasuk() {
         if ($_SERVER['REQUEST_METHOD'] != 'POST') {
@@ -119,67 +119,76 @@ class StaffController extends Controller {
             exit;
         }
 
-        // --- 1. Penanganan File Upload ---
-        $buktiFotoNama = null;
-        if (isset($_FILES['bukti_foto']) && $_FILES['bukti_foto']['error'] == UPLOAD_ERR_OK) {
-            
-            $file = $_FILES['bukti_foto'];
-            $fileTmpName = $file['tmp_name'];
-            $fileSize = $file['size'];
-            $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+        // --- 1. Validasi Wajib Diisi (Server Side) ---
+        // Kita pastikan Lot, Tgl Produksi, dan Expired Date terisi
+        if (empty($_POST['lot_number']) || empty($_POST['production_date']) || empty($_POST['exp_date'])) {
+            $_SESSION['flash_message'] = ['text' => 'Gagal: Nomor Batch, Tanggal Produksi, dan Expired Date WAJIB diisi!', 'type' => 'error'];
+            header('Location: ' . BASE_URL . 'staff/barangMasuk');
+            exit;
+        }
 
-            if (in_array($fileExt, $allowed)) {
-                if ($fileSize < 5000000) { // Maks 5MB
-                    $buktiFotoNama = "bukti_" . time() . "." . $fileExt;
-                    // Path absolut untuk memindahkan file
-                    $fileDestination = APPROOT . '/../public/uploads/bukti_transaksi/' . $buktiFotoNama;
-                    
-                    if (!move_uploaded_file($fileTmpName, $fileDestination)) {
-                         $_SESSION['flash_message'] = ['text' => 'Gagal memindahkan file yang diupload.', 'type' => 'error'];
-                         header('Location: ' . BASE_URL . 'staff/barangMasuk');
-                         exit;
+        // --- 2. Penanganan File Upload (MULTI-FILE) ---
+        $uploadedFiles = [];
+        
+        // Cek apakah ada file yang diupload dan tidak error
+        if (isset($_FILES['bukti_foto']) && !empty($_FILES['bukti_foto']['name'][0])) {
+            $files = $_FILES['bukti_foto'];
+            $count = count($files['name']); // Hitung jumlah file yang diupload
+
+            for ($i = 0; $i < $count; $i++) {
+                // Cek error per file
+                if ($files['error'][$i] == UPLOAD_ERR_OK) {
+                    $ext = strtolower(pathinfo($files['name'][$i], PATHINFO_EXTENSION));
+                    $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+
+                    // Validasi Tipe dan Ukuran (Max 5MB per file)
+                    if (in_array($ext, $allowed) && $files['size'][$i] < 5000000) {
+                        // Buat nama unik: bukti_[timestamp]_[index].[ext]
+                        $newName = "bukti_" . time() . "_{$i}." . $ext;
+                        $dest = APPROOT . '/../public/uploads/bukti_transaksi/' . $newName;
+                        
+                        // Pindahkan file
+                        if (move_uploaded_file($files['tmp_name'][$i], $dest)) {
+                            $uploadedFiles[] = $newName; // Masukkan nama file sukses ke array
+                        }
                     }
-                } else {
-                    $_SESSION['flash_message'] = ['text' => 'Gagal: Ukuran file terlalu besar (Maks 5MB).', 'type' => 'error'];
-                    header('Location: ' . BASE_URL . 'staff/barangMasuk');
-                    exit;
                 }
-            } else {
-                $_SESSION['flash_message'] = ['text' => 'Gagal: Tipe file tidak diizinkan (Hanya JPG, PNG, PDF).', 'type' => 'error'];
-                header('Location: ' . BASE_URL . 'staff/barangMasuk');
-                exit;
             }
         }
 
-        // --- 2. Kumpulkan Data Form ---
+        // Ubah array nama file menjadi format JSON (String) agar bisa masuk ke kolom TEXT di database
+        // Jika tidak ada file, biarkan null
+        $buktiFotoJSON = !empty($uploadedFiles) ? json_encode($uploadedFiles) : null;
+
+        // --- 3. Kumpulkan Data ---
         $data = [
-            'product_id'   => $_POST['product_id'],
-            'user_id'      => $_SESSION['user_id'], // ID Staff yang sedang login
-            'jumlah'       => (int)$_POST['jumlah'],
-            'supplier_id'  => $_POST['supplier_id'],
-            'lokasi_id'    => $_POST['lokasi_id'],
-            'status_id'    => $_POST['status_id'],
-            'lot_number'   => !empty($_POST['lot_number']) ? $_POST['lot_number'] : null,
-            'exp_date'     => !empty($_POST['exp_date']) ? $_POST['exp_date'] : null,
-            'keterangan'   => $_POST['keterangan'],
-            'bukti_foto'   => $buktiFotoNama // Nama file yang sudah di-upload
+            'product_id'      => $_POST['product_id'],
+            'user_id'         => $_SESSION['user_id'],
+            'jumlah'          => (int)$_POST['jumlah'],
+            'supplier_id'     => $_POST['supplier_id'],
+            'lokasi_id'       => $_POST['lokasi_id'],
+            'status_id'       => $_POST['status_id'],
+            'lot_number'      => trim($_POST['lot_number']),     // Pastikan spasi hilang
+            'production_date' => $_POST['production_date'],
+            'exp_date'        => $_POST['exp_date'],
+            'keterangan'      => $_POST['keterangan'],
+            'bukti_foto'      => $buktiFotoJSON // <--- Simpan sebagai JSON String
         ];
 
-        // --- 3. Kirim ke Model ---
+        // --- 4. Kirim ke Model ---
         $transactionModel = $this->model('Transaction_model');
 
         try {
-            // Panggil method addBarangMasuk yang sudah kita buat
             $transactionModel->addBarangMasuk($data);
-            $_SESSION['flash_message'] = ['text' => 'Barang masuk berhasil dicatat.', 'type' => 'success'];
+            $_SESSION['flash_message'] = ['text' => 'Barang masuk berhasil dicatat (Batch & Bukti Tersimpan).', 'type' => 'success'];
         } catch (Exception $e) {
-            $_SESSION['flash_message'] = ['text' => 'Gagal mencatat barang masuk: ' . $e->getMessage(), 'type' => 'error'];
+            $_SESSION['flash_message'] = ['text' => 'Gagal: ' . $e->getMessage(), 'type' => 'error'];
         }
 
         header('Location: ' . BASE_URL . 'staff/barangMasuk');
         exit;
     }
+    
     /*
     |--------------------------------------------------------------------------
     | METODE UNTUK TRANSAKSI BARANG KELUAR
@@ -677,4 +686,15 @@ public function processCheckOut() {
     exit;
 }
 
+/**
+     * [AJAX] Get Auto Batch Number
+     */
+    public function getAutoBatchCode() {
+        $model = $this->model('Transaction_model');
+        $code = $model->generateBatchNumber();
+        
+        header('Content-Type: application/json');
+        echo json_encode(['code' => $code]);
+        exit;
+    }
 }

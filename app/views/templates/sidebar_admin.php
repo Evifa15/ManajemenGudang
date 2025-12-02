@@ -1,84 +1,123 @@
+<?php
+    // Helper sederhana untuk cek URL aktif
+    // Ambil bagian terakhir dari URL (method name)
+    $currentUrl = $_GET['url'] ?? 'admin/dashboard';
+    $urlParts = explode('/', $currentUrl);
+    $method = $urlParts[1] ?? 'dashboard'; 
+?>
+
 <nav class="app-sidebar">
-    <ul>
-        <li class="<?php echo ($data['judul'] == 'Dashboard Admin') ? 'active' : ''; ?>">
-            <a href="<?php echo BASE_URL; ?>admin/dashboard">Dashboard</a>
-        </li>
-        
-        <li class="<?php echo (
-                str_starts_with($data['judul'], 'Manajemen Barang') || 
-                str_starts_with($data['judul'], 'Tambah Barang') || 
-                str_starts_with($data['judul'], 'Edit Barang') ||
-                str_starts_with($data['judul'], 'Konfigurasi Data') // Supaya tetap aktif saat di halaman Tabulasi
-            ) ? 'active' : ''; ?>">
+    <div class="sidebar-header">
+        <div class="brand-logo">📦 Gudang</div>
+    </div>
+
+    <div class="sidebar-menu">
+        <ul>
+            <li class="<?php echo ($method == 'dashboard') ? 'active' : ''; ?>">
+                <a href="<?php echo BASE_URL; ?>admin/dashboard">Dashboard</a>
+            </li>
             
-            <a href="<?php echo BASE_URL; ?>admin/barang">Master Data Barang</a>
-        </li>
+            <li class="<?php echo (in_array($method, ['barang', 'addBarang', 'editBarang', 'detailBarang'])) ? 'active' : ''; ?>">
+                <a href="<?php echo BASE_URL; ?>admin/barang">Master Data Barang</a>
+            </li>
 
-        <li><a href="#">Menu Transaksi</a>
-            <ul class="submenu">
-                <li class="<?php echo (str_starts_with($data['judul'], 'Riwayat Barang Masuk')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/riwayatBarangMasuk">Riwayat Barang Masuk</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Riwayat Barang Keluar')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/riwayatBarangKeluar">Riwayat Barang Keluar</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Riwayat Retur/Rusak')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/riwayatReturRusak">Riwayat Retur/Rusak</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Riwayat Peminjaman')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/riwayatPeminjaman">Riwayat Peminjaman</a>
-                </li>
-            </ul>
-        </li>
+            <?php 
+                // Cek apakah halaman saat ini termasuk dalam grup transaksi
+                $isTransaksiActive = in_array($method, ['riwayatBarangMasuk', 'detailBarangMasuk', 'riwayatBarangKeluar', 'riwayatReturRusak', 'riwayatPeminjaman']);
+            ?>
+            <li class="<?php echo $isTransaksiActive ? 'active' : ''; ?>">
+                <a href="#">Menu Transaksi</a>
+                <ul class="submenu">
+                    <li class="<?php echo ($method == 'riwayatBarangMasuk' || $method == 'detailBarangMasuk') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/riwayatBarangMasuk">Riwayat Masuk</a>
+                    </li>
+                    <li class="<?php echo ($method == 'riwayatBarangKeluar') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/riwayatBarangKeluar">Riwayat Keluar</a>
+                    </li>
+                    <li class="<?php echo ($method == 'riwayatReturRusak') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/riwayatReturRusak">Retur/Rusak</a>
+                    </li>
+                    <li class="<?php echo ($method == 'riwayatPeminjaman') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/riwayatPeminjaman">Peminjaman</a>
+                    </li>
+                </ul>
+            </li>
 
-        <li><a href="#">Menu Operasi Kritis</a>
-            <ul class="submenu">
-                <li class="<?php echo (str_starts_with($data['judul'], 'Perintah Opname')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/perintahOpname">Perintah Opname (Aktif)</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Riwayat Opname')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/riwayatOpname">Riwayat / Arsip Opname</a>
-                </li>
-            </ul>
-        </li>
+            <?php 
+                $isOpnameActive = in_array($method, ['perintahOpname', 'riwayatOpname', 'detailRiwayatOpname']);
+            ?>
+            <li class="<?php echo $isOpnameActive ? 'active' : ''; ?>">
+                <a href="#">Operasi Kritis</a>
+                <ul class="submenu">
+                    <li class="<?php echo ($method == 'perintahOpname') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/perintahOpname">Stock Opname</a>
+                    </li>
+                    <li class="<?php echo ($method == 'riwayatOpname' || $method == 'detailRiwayatOpname') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/riwayatOpname">Arsip Opname</a>
+                    </li>
+                </ul>
+            </li>
 
-        <li><a href="#">Administrasi Sistem</a>
-            <ul class="submenu">
-                <li class="<?php echo ($data['judul'] == 'Manajemen Pengguna') ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/users">Manajemen Pengguna</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Backup & Restore')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/manageBackup">Backup & Restore</a>
-                </li>
-            </ul>
-        </li>
+            <?php 
+                $isAdminActive = in_array($method, ['users', 'addUser', 'editUser', 'masterDataConfig', 'addKategori', 'editKategori', 'manageBackup']);
+            ?>
+            <li class="<?php echo $isAdminActive ? 'active' : ''; ?>">
+                <a href="#">Administrasi</a>
+                <ul class="submenu">
+                    <li class="<?php echo (str_contains($method, 'user')) ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/users">Manajemen User</a>
+                    </li>
+                    <li class="<?php echo ($method == 'masterDataConfig' || str_contains($method, 'Kategori') || str_contains($method, 'Satuan')) ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/masterDataConfig">Data Master Lain</a>
+                    </li>
+                    <li class="<?php echo ($method == 'manageBackup') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/manageBackup">Backup/Restore</a>
+                    </li>
+                </ul>
+            </li>
 
-        <li><a href="#">Laporan & Pengawasan</a>
-            <ul class="submenu">
-                <li class="<?php echo (str_starts_with($data['judul'], 'Laporan Stok Akhir')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/laporanStok">Laporan Stok Akhir</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Laporan Transaksi')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/laporanTransaksi">Laporan Transaksi</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Laporan Peminjaman')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/laporanPeminjaman">Laporan Peminjaman</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Rekap Absensi')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/rekapAbsensi">Rekap Absensi</a>
-                </li>
-                <li class="<?php echo (str_starts_with($data['judul'], 'Audit Trail')) ? 'active' : ''; ?>">
-                    <a href="<?php echo BASE_URL; ?>admin/auditTrail">Audit Trail</a>
-                </li>
-            </ul>
-        </li>
-        
-    </ul>
-    
+            <?php 
+                $isLaporanActive = in_array($method, ['laporanStok', 'laporanTransaksi', 'rekapAbsensi', 'auditTrail']);
+            ?>
+            <li class="<?php echo $isLaporanActive ? 'active' : ''; ?>">
+                <a href="#">Laporan</a>
+                <ul class="submenu">
+                    <li class="<?php echo ($method == 'laporanStok') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/laporanStok">Stok Akhir</a>
+                    </li>
+                    <li class="<?php echo ($method == 'laporanTransaksi') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/laporanTransaksi">Arus Transaksi</a>
+                    </li>
+                    <li class="<?php echo ($method == 'rekapAbsensi') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/rekapAbsensi">Absensi</a>
+                    </li>
+                    <li class="<?php echo ($method == 'auditTrail') ? 'active' : ''; ?>">
+                        <a href="<?php echo BASE_URL; ?>admin/auditTrail">Audit Trail</a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
     <div class="sidebar-profile-link">
-        <a href="<?php echo BASE_URL; ?>profile/index" 
-           class="<?php echo (str_starts_with($data['judul'], 'Profil Saya')) ? 'active' : ''; ?>">
-            Profil Saya
-        </a>
+        <a href="<?php echo BASE_URL; ?>profile/index">Profil Saya</a>
     </div>
 </nav>
+
+<div class="main-content">
+    
+    <header class="app-header">
+        <div class="mobile-menu-toggle">
+            ☰
+        </div>
+        
+        <div class="page-title">
+            <?php echo $data['judul']; ?> 
+        </div>
+        
+        <a href="<?php echo BASE_URL; ?>auth/logout" class="btn-logout" onclick="return confirm('Yakin ingin keluar?');" title="Keluar Aplikasi">
+            <span class="icon"></span> Logout
+        </a>
+    </header>
+    
+    <div class="app-content">

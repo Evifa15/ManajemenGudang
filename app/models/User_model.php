@@ -290,47 +290,66 @@ class User_model extends Model {
     }
 
     /**
-     * Update profil user (FIXED: Eksekusi query profil sebelum query user)
+     * Update profil user (Versi Stabil: Cek -> Insert/Update)
      */
     public function updateProfile($data) {
-        // 1. QUERY PERTAMA: Update Tabel Profil (Foto, Alamat, dll)
-        $this->query("INSERT INTO user_profiles 
-                        (user_id, foto_profil, tempat_lahir, tanggal_lahir, agama, telepon, alamat, kota, provinsi, kode_pos)
-                      VALUES 
-                        (:user_id, :foto_profil, :tempat_lahir, :tanggal_lahir, :agama, :telepon, :alamat, :kota, :provinsi, :kode_pos)
-                      ON DUPLICATE KEY UPDATE
-                        foto_profil = :foto_profil,
-                        tempat_lahir = :tempat_lahir,
-                        tanggal_lahir = :tanggal_lahir,
-                        agama = :agama,
-                        telepon = :telepon,
-                        alamat = :alamat,
-                        kota = :kota,
-                        provinsi = :provinsi,
-                        kode_pos = :kode_pos");
+        $this->db->beginTransaction(); // Pakai transaksi biar aman
 
-        $this->bind('user_id', $data['user_id'], PDO::PARAM_INT);
-        $this->bind('foto_profil', $data['foto_profil']);
-        $this->bind('tempat_lahir', $data['tempat_lahir']);
-        $this->bind('tanggal_lahir', $data['tanggal_lahir']);
-        $this->bind('agama', $data['agama']);
-        $this->bind('telepon', $data['telepon']);
-        $this->bind('alamat', $data['alamat']);
-        $this->bind('kota', $data['kota']);
-        $this->bind('provinsi', $data['provinsi']);
-        $this->bind('kode_pos', $data['kode_pos']);
+        try {
+            // 1. Cek apakah data profil sudah ada?
+            $this->query("SELECT profile_id FROM user_profiles WHERE user_id = :uid");
+            $this->bind('uid', $data['user_id']);
+            $exists = $this->single();
 
-        // --- INI YANG SEBELUMNYA HILANG! ---
-        // Kita harus eksekusi query profil dulu sebelum menyiapkan query nama.
-        $this->execute(); 
-        // -----------------------------------
+            if ($exists) {
+                // A. UPDATE jika sudah ada
+                $this->query("UPDATE user_profiles SET 
+                                foto_profil = :foto,
+                                tempat_lahir = :tempat,
+                                tanggal_lahir = :tgl,
+                                agama = :agama,
+                                telepon = :telp,
+                                alamat = :alamat,
+                                kota = :kota,
+                                provinsi = :prov,
+                                kode_pos = :pos
+                              WHERE user_id = :uid");
+            } else {
+                // B. INSERT jika belum ada
+                $this->query("INSERT INTO user_profiles 
+                                (user_id, foto_profil, tempat_lahir, tanggal_lahir, agama, telepon, alamat, kota, provinsi, kode_pos)
+                              VALUES 
+                                (:uid, :foto, :tempat, :tgl, :agama, :telp, :alamat, :kota, :prov, :pos)");
+            }
 
-        // 2. QUERY KEDUA: Update Tabel Users (Nama Lengkap)
-        $this->query("UPDATE users SET nama_lengkap = :nama_lengkap WHERE user_id = :user_id");
-        $this->bind('nama_lengkap', $data['nama_lengkap']);
-        $this->bind('user_id', $data['user_id'], PDO::PARAM_INT);
-        
-        return $this->execute(); 
+            // Bind parameter (Sama untuk Insert/Update)
+            $this->bind('uid', $data['user_id']);
+            $this->bind('foto', $data['foto_profil']);
+            $this->bind('tempat', $data['tempat_lahir']);
+            $this->bind('tgl', $data['tanggal_lahir']);
+            $this->bind('agama', $data['agama']);
+            $this->bind('telp', $data['telepon']);
+            $this->bind('alamat', $data['alamat']);
+            $this->bind('kota', $data['kota']);
+            $this->bind('prov', $data['provinsi']);
+            $this->bind('pos', $data['kode_pos']);
+            
+            $this->execute(); // Eksekusi Query Profil
+
+            // 2. Update Nama Lengkap di tabel Users
+            $this->query("UPDATE users SET nama_lengkap = :nama WHERE user_id = :uid");
+            $this->bind('nama', $data['nama_lengkap']);
+            $this->bind('uid', $data['user_id']);
+            $this->execute(); // Eksekusi Query User
+
+            $this->db->commit();
+            return true;
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            // Throw error agar bisa ditangkap Controller
+            throw new Exception("Gagal update profil: " . $e->getMessage());
+        }
     }
 
     /**

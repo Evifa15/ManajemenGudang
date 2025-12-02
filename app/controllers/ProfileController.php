@@ -29,21 +29,17 @@ class ProfileController extends Controller {
         $this->view('profile/index', $data);
     }
 
-    /**
-     * Memproses update Info Pribadi & Kontak (DENGAN FITUR UPLOAD FOTO)
-     */
     public function processProfileInfo() {
         if ($_SERVER['REQUEST_METHOD'] != 'POST') {
             header('Location: ' . BASE_URL . 'profile/index');
             exit;
         }
 
-        // 1. Ambil Data Profil Lama (Untuk mendapatkan nama foto saat ini)
+        // 1. Ambil Data Profil Lama
         $userModel = $this->model('User_model');
         $currentProfile = $userModel->getJoinedUserProfile($_SESSION['user_id']);
         
-        // Default: Gunakan foto lama (jika user tidak upload foto baru)
-        $fotoNama = $currentProfile['foto_profil']; 
+        $fotoNama = $currentProfile['foto_profil'] ?? null; 
 
         // 2. Logika Upload Foto Baru
         if (isset($_FILES['foto_profil']) && $_FILES['foto_profil']['error'] == UPLOAD_ERR_OK) {
@@ -51,70 +47,55 @@ class ProfileController extends Controller {
             $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             $allowed = ['jpg', 'jpeg', 'png', 'gif'];
 
-            // Validasi Ekstensi
             if (in_array($fileExt, $allowed)) {
-                // Validasi Ukuran (Max 2MB)
                 if ($file['size'] <= 2000000) { 
-                    // Buat nama file unik: profil_[USER_ID]_[WAKTU].[EXT]
                     $newFileName = "profil_" . $_SESSION['user_id'] . "_" . time() . "." . $fileExt;
-                    
-                    // Tentukan lokasi simpan (public/uploads/profil/)
                     $destination = APPROOT . '/../public/uploads/profil/' . $newFileName;
                     
-                    // Buat folder jika belum ada (Penting!)
                     if (!file_exists(dirname($destination))) {
                         mkdir(dirname($destination), 0777, true);
                     }
 
-                    // Pindahkan file
                     if (move_uploaded_file($file['tmp_name'], $destination)) {
-                        // Hapus foto lama dari folder (untuk hemat penyimpanan)
-                        // Cek apakah foto lama ada dan bukan null
                         if ($fotoNama && file_exists(APPROOT . '/../public/uploads/profil/' . $fotoNama)) {
                             unlink(APPROOT . '/../public/uploads/profil/' . $fotoNama);
                         }
-                        
-                        // Update variabel untuk disimpan ke DB
                         $fotoNama = $newFileName; 
-                    } else {
-                        $_SESSION['flash_message'] = ['text' => 'Gagal memindahkan file foto.', 'type' => 'error'];
-                        header('Location: ' . BASE_URL . 'profile/index');
-                        exit;
                     }
-                } else {
-                    $_SESSION['flash_message'] = ['text' => 'Ukuran foto terlalu besar (Max 2MB).', 'type' => 'error'];
-                    header('Location: ' . BASE_URL . 'profile/index');
-                    exit;
                 }
-            } else {
-                $_SESSION['flash_message'] = ['text' => 'Format file tidak didukung (Gunakan JPG/PNG).', 'type' => 'error'];
-                header('Location: ' . BASE_URL . 'profile/index');
-                exit;
             }
         }
 
-        // 3. Kumpulkan Data untuk Update Database
+        // 3. Kumpulkan Data (DENGAN VALIDASI NULL)
+        // Fungsi helper kecil untuk mengubah string kosong jadi NULL
+        $fixNull = function($val) {
+            return empty($val) ? null : $val;
+        };
+
         $data = [
-            'user_id' => $_SESSION['user_id'],
-            'nama_lengkap' => $_POST['nama_lengkap'],
-            'foto_profil' => $fotoNama, // <--- INI KUNCINYA (File baru atau lama)
-            'tempat_lahir' => $_POST['tempat_lahir'],
-            'tanggal_lahir' => $_POST['tanggal_lahir'],
-            'agama' => $_POST['agama'],
-            'telepon' => $_POST['telepon'],
-            'alamat' => $_POST['alamat'],
-            'kota' => $_POST['kota'],
-            'provinsi' => $_POST['provinsi'],
-            'kode_pos' => $_POST['kode_pos']
+            'user_id'       => $_SESSION['user_id'],
+            'nama_lengkap'  => $_POST['nama_lengkap'],
+            'foto_profil'   => $fotoNama,
+            'tempat_lahir'  => $fixNull($_POST['tempat_lahir']),
+            'tanggal_lahir' => $fixNull($_POST['tanggal_lahir']), // <--- INI KRUSIAL
+            'agama'         => $fixNull($_POST['agama']),
+            'telepon'       => $fixNull($_POST['telepon']),
+            'alamat'        => $fixNull($_POST['alamat']),
+            'kota'          => $fixNull($_POST['kota']),
+            'provinsi'      => $fixNull($_POST['provinsi']),
+            'kode_pos'      => $fixNull($_POST['kode_pos'])
         ];
         
         // 4. Eksekusi Update
-        if ($userModel->updateProfile($data)) {
-            // Update nama di session agar header langsung berubah jika nama diganti
-            $_SESSION['nama_lengkap'] = $data['nama_lengkap']; 
-            $_SESSION['flash_message'] = ['text' => 'Profil berhasil diperbarui.', 'type' => 'success'];
-        } else {
-            $_SESSION['flash_message'] = ['text' => 'Gagal mengupdate profil di database.', 'type' => 'error'];
+        try {
+            if ($userModel->updateProfile($data)) {
+                $_SESSION['nama_lengkap'] = $data['nama_lengkap']; 
+                $_SESSION['flash_message'] = ['text' => 'Profil berhasil diperbarui.', 'type' => 'success'];
+            } else {
+                $_SESSION['flash_message'] = ['text' => 'Gagal mengupdate profil database.', 'type' => 'error'];
+            }
+        } catch (Exception $e) {
+            $_SESSION['flash_message'] = ['text' => 'Error: ' . $e->getMessage(), 'type' => 'error'];
         }
 
         header('Location: ' . BASE_URL . 'profile/index');

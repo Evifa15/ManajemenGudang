@@ -3,10 +3,13 @@
     require_once APPROOT . '/views/templates/sidebar_admin.php';
 ?>
 
-<main class="app-content">
+<main class="app-content" data-base-url="<?php echo BASE_URL; ?>">
     
     <div class="content-header">
         <h1>Riwayat Barang Masuk</h1>
+        <button type="button" id="btnExportMasuk" class="btn" style="background-color: #28a745; color: white;">
+            📄 Export Data
+        </button>
     </div>
 
     <div class="search-container" style="padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px;">
@@ -47,13 +50,12 @@
                 <tr>
                     <th>Tanggal Input</th>
                     <th>Nama Barang</th>
-                    <th>Jumlah</th>
+                    <th>Status Exp</th> <th>Jumlah</th>
                     <th>Satuan</th>
                     <th>Supplier</th>
                     <th>Diinput oleh</th>
                     <th>Lot/Batch</th>
-                    <th>Tgl. Kedaluwarsa</th>
-                    <th>Bukti</th>
+                    <th style="text-align: center;">Aksi</th>
                 </tr>
             </thead>
             <tbody id="tableBodyMasuk">
@@ -63,18 +65,43 @@
                     <?php foreach ($data['history'] as $his) : ?>
                     <tr>
                         <td><?php echo date('d-m-Y H:i', strtotime($his['created_at'])); ?></td>
-                        <td><?php echo htmlspecialchars($his['nama_barang']); ?></td>
+                        
+                        <td style="font-weight: bold;"><?php echo htmlspecialchars($his['nama_barang']); ?></td>
+                        
+                        <td>
+                            <?php 
+                            if (!empty($his['exp_date'])) {
+                                $tglExp = new DateTime($his['exp_date']);
+                                $hariIni = new DateTime();
+                                $selisih = $hariIni->diff($tglExp);
+                                $sisaHari = (int)$selisih->format('%r%a');
+
+                                if ($sisaHari < 0) {
+                                    echo '<span style="color:white; background:#dc3545; padding:3px 8px; border-radius:4px; font-size:0.85em; font-weight:bold;">EXPIRED</span>';
+                                } elseif ($sisaHari <= 90) { 
+                                    echo '<span style="color:black; background:#ffc107; padding:3px 8px; border-radius:4px; font-size:0.85em; font-weight:bold;">Warning (< 3 Bln)</span>';
+                                } else {
+                                    echo '<span style="color:green; font-size:0.85em;">Aman</span>';
+                                }
+                            } else {
+                                echo '<span style="color:#999;">-</span>';
+                            }
+                            ?>
+                        </td>
+
                         <td><strong><?php echo (int)$his['jumlah']; ?></strong></td> 
-                        <td><?php echo htmlspecialchars($his['nama_satuan']); ?></td> <td><?php echo htmlspecialchars($his['nama_supplier']); ?></td>
+                        <td><?php echo htmlspecialchars($his['nama_satuan']); ?></td> 
+                        <td><?php echo htmlspecialchars($his['nama_supplier']); ?></td>
                         <td><?php echo htmlspecialchars($his['staff_nama']); ?></td>
                         <td><?php echo htmlspecialchars($his['lot_number']); ?></td>
-                        <td><?php echo $his['exp_date'] ? date('d-m-Y', strtotime($his['exp_date'])) : '-'; ?></td>
-                        <td>
-                            <?php if($his['bukti_foto']): ?>
-                                <a href="<?php echo BASE_URL . 'uploads/bukti_transaksi/' . $his['bukti_foto']; ?>" target="_blank" class="btn btn-primary btn-sm">Lihat</a>
-                            <?php else: ?>
-                                -
-                            <?php endif; ?>
+                        
+                        <td style="text-align: center;">
+                            <a href="<?php echo BASE_URL; ?>admin/detailBarangMasuk/<?php echo $his['transaction_id']; ?>" 
+                               class="btn btn-sm" 
+                               style="background-color: #17a2b8; color: white; text-decoration: none; padding: 5px 10px; border-radius: 4px;"
+                               title="Lihat Detail Lengkap">
+                                🔍 Detail
+                            </a>
                         </td>
                     </tr>
                     <?php endforeach; ?>
