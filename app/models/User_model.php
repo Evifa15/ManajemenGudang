@@ -13,62 +13,24 @@ class User_model extends Model {
      * Mengembalikan Array: ['status' => '...', 'data' => ...]
      */
     public function checkLogin($email, $password) {
-        // 1. Cari User berdasarkan Email
-        $this->query("SELECT * FROM " . $this->table . " WHERE email = :email");
-        $this->bind('email', $email);
-        $user = $this->single();
+    // 1. Cari User berdasarkan Email
+    $this->query("SELECT * FROM " . $this->table . " WHERE email = :email");
+    $this->bind('email', $email);
+    $user = $this->single();
 
-        // KASUS A: Email Tidak Ditemukan
-        if (!$user) {
-            return ['status' => 'EMAIL_NOT_FOUND'];
-        }
-
-        // KASUS B: Akun Terkunci
-        if ($user['is_locked'] == 1) {
-            return ['status' => 'ACCOUNT_LOCKED'];
-        }
-
-        // 2. Verifikasi Password
-        if (password_verify($password, $user['password'])) {
-            // SUKSES: Reset percobaan login jika berhasil
-            $this->resetLoginAttempts($user['user_id']);
-            unset($user['password']); // Hapus password dari array session
-            return ['status' => 'SUCCESS', 'data' => $user];
-        } else {
-            // GAGAL: Password Salah -> Increment percobaan
-            $attempts = $user['login_attempts'] + 1;
-            $this->updateLoginAttempts($user['user_id'], $attempts);
-
-            // Cek apakah sudah 5 kali salah?
-            if ($attempts >= 5) {
-                $this->lockAccount($user['user_id']);
-                return ['status' => 'LOCKED_NOW']; // Baru saja terkunci
-            }
-
-            return ['status' => 'PASSWORD_WRONG', 'attempts' => $attempts];
-        }
+    // KASUS A: Email Tidak Ditemukan
+    if (!$user) {
+        return ['status' => 'EMAIL_NOT_FOUND'];
     }
 
-    // --- HELPER METHODS BARU ---
-
-    private function updateLoginAttempts($userId, $count) {
-        $this->query("UPDATE " . $this->table . " SET login_attempts = :count WHERE user_id = :id");
-        $this->bind('count', $count);
-        $this->bind('id', $userId);
-        $this->execute();
+    // 2. Verifikasi Password (TANPA LOGIKA LOCK)
+    if (password_verify($password, $user['password'])) {
+        unset($user['password']); 
+        return ['status' => 'SUCCESS', 'data' => $user];
+    } else {
+        return ['status' => 'PASSWORD_WRONG'];
     }
-
-    private function resetLoginAttempts($userId) {
-        $this->query("UPDATE " . $this->table . " SET login_attempts = 0 WHERE user_id = :id");
-        $this->bind('id', $userId);
-        $this->execute();
-    }
-
-    private function lockAccount($userId) {
-        $this->query("UPDATE " . $this->table . " SET is_locked = 1 WHERE user_id = :id");
-        $this->bind('id', $userId);
-        $this->execute();
-    }
+}
 
     /**
      * Mengambil semua data user dari database.
@@ -83,10 +45,11 @@ class User_model extends Model {
      * Mengambil satu data user berdasarkan ID.
      */
     public function getUserById($id) {
-        $this->query("SELECT * FROM " . $this->table . " WHERE user_id = :id");
-        $this->bind('id', $id);
-        return $this->single();
-    }
+    // Hapus '->db', gunakan method helper dari class Model
+    $this->query("SELECT user_id, nama_lengkap, tanggal_lahir, email, role FROM users WHERE user_id = :id");
+    $this->bind('id', $id);
+    return $this->single();
+}
 
     /**
      * Menyimpan data user baru ke database.
@@ -114,39 +77,30 @@ class User_model extends Model {
      * Mengupdate data user di database.
      */
     public function updateUser($data) {
-        
-        $isPasswordEmpty = empty($data['password']);
-
-        // REVISI: status_login DIHAPUS dari UPDATE
-        $query = "UPDATE users SET 
-                    nama_lengkap = :nama_lengkap, 
-                    email = :email, 
-                    role = :role"; 
-        
-        if (!$isPasswordEmpty) {
-            $query .= ", password = :password";
-        }
-        
-        $query .= " WHERE user_id = :user_id";
-        
-        $this->query($query);
-
-        $this->bind('nama_lengkap', $data['nama_lengkap']);
-        $this->bind('email', $data['email']);
-        $this->bind('role', $data['role']);
-        $this->bind('user_id', $data['user_id']);
-
-        if (!$isPasswordEmpty) {
-            $hashedPassword = password_hash($data['password'], PASSWORD_DEFAULT);
-            $this->bind('password', $hashedPassword);
-        }
-
-        if ($this->execute()) {
-            return true;
-        } else {
-            return false;
-        }
+    // Cek apakah password diisi (diganti) atau tidak
+    if (!empty($data['password'])) {
+        $query = "UPDATE users SET nama_lengkap = :nama, tanggal_lahir = :tgl, email = :email, role = :role, password = :pass WHERE user_id = :id";
+    } else {
+        $query = "UPDATE users SET nama_lengkap = :nama, tanggal_lahir = :tgl, email = :email, role = :role WHERE user_id = :id";
     }
+
+    // PERBAIKAN: Gunakan $this->query, bukan $this->db->query
+    $this->query($query);
+    
+    // PERBAIKAN: Gunakan $this->bind
+    $this->bind('nama', $data['nama_lengkap']);
+    $this->bind('tgl', $data['tanggal_lahir']);
+    $this->bind('email', $data['email']);
+    $this->bind('role', $data['role']);
+    $this->bind('id', $data['user_id']);
+
+    if (!empty($data['password'])) {
+        $this->bind('pass', password_hash($data['password'], PASSWORD_DEFAULT));
+    }
+
+    // PERBAIKAN: Gunakan $this->execute
+    return $this->execute();
+}
 
     /**
      * Menghapus data user.
@@ -231,49 +185,45 @@ class User_model extends Model {
     }
 
     /**
-     * Mengimpor pengguna via CSV (VERSI SMART: Skip Duplikat)
-     * Tidak membatalkan semua jika ada satu yang gagal.
+     * Mengimpor pengguna via CSV (Update dengan Tanggal Lahir)
      */
     public function importUsers($users) {
         $summary = [
             'success' => 0,
             'skipped' => 0,
             'errors'  => 0,
-            'skipped_list' => [] // Menyimpan email yang duplikat
+            'skipped_list' => []
         ];
 
-        // Query disiapkan sekali di luar loop agar efisien
-        $this->query("INSERT INTO users (nama_lengkap, email, password, role) 
-                      VALUES (:nama_lengkap, :email, :password, :role)");
+        // PERBAIKAN: Menghapus 'is_active' dan memastikan urutan :email dan :tgl benar
+        $sql = "INSERT INTO users (nama_lengkap, email, tanggal_lahir, password, role) 
+                VALUES (:nama_lengkap, :email, :tgl, :password, :role)";
+        
+        $this->query($sql);
 
         foreach ($users as $user) {
             try {
-                // Hash password
                 $hashedPassword = password_hash($user['password'], PASSWORD_DEFAULT);
 
                 $this->bind('nama_lengkap', $user['nama_lengkap']);
                 $this->bind('email', $user['email']);
+                $this->bind('tgl', $user['tanggal_lahir']);
                 $this->bind('password', $hashedPassword);
                 $this->bind('role', $user['role']);
                 
-                // Coba Eksekusi per satu baris
                 $this->execute();
-                $summary['success']++; // Jika berhasil, tambah counter sukses
+                $summary['success']++; 
 
             } catch (PDOException $e) {
-                // Cek Kode Error 1062 (Duplicate Entry / Email Kembar)
                 if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
-                    // Jangan hentikan proses, cukup catat sebagai 'skipped'
                     $summary['skipped']++;
                     $summary['skipped_list'][] = $user['email'];
                 } else {
-                    // Error lain (misal koneksi putus), catat error
                     $summary['errors']++;
                 }
             }
         }
 
-        // Kembalikan laporan lengkap ke Controller
         return $summary;
     }
 
@@ -405,6 +355,26 @@ class User_model extends Model {
             $this->bind(($k + 1), $id);
         }
         
+        return $this->execute();
+    }
+
+    /**
+     * [BARU] Menambahkan user baru dengan Tanggal Lahir.
+     * Menggantikan/Melengkapi fungsi createUser yang lama.
+     */
+   public function addUser($data) {
+        // PERBAIKAN: Menghapus 'is_active' karena tidak ada di database
+        $query = "INSERT INTO users (nama_lengkap, tanggal_lahir, email, password, role) 
+                  VALUES (:nama, :tgl, :email, :pass, :role)";
+        
+        $this->query($query);
+        
+        $this->bind('nama', $data['nama_lengkap']);
+        $this->bind('tgl', $data['tanggal_lahir']); 
+        $this->bind('email', $data['email']);
+        $this->bind('pass', password_hash($data['password'], PASSWORD_DEFAULT)); 
+        $this->bind('role', $data['role']);
+
         return $this->execute();
     }
     

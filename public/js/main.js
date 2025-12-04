@@ -36,9 +36,10 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => { alertBox.remove(); }, 500);
         }, 3000);
     }
+  
 
     /* =========================================
-       2. FITUR MANAJEMEN PENGGUNA (ADMIN)
+       2. FITUR MANAJEMEN PENGGUNA (ADMIN) - REVISI VISUAL JS
        ========================================= */
     const liveSearchInput = document.getElementById('liveSearchInput');
 
@@ -50,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedCountSpan = document.getElementById('selectedCount');
         const selectAllCheckbox = document.getElementById('selectAll');
         const filterRole = document.getElementById('filterRole');
-        const paginationContainerUsers = document.querySelector('.pagination-container');
+        const paginationContainerUsers = document.getElementById('paginationContainerUsers');
 
         function loadUsers(page = 1, source = null) {
             let searchVal = liveSearchInput.value;
@@ -75,15 +76,73 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     let html = '';
                     if (data.users.length === 0) {
-                        html = '<tr><td colspan="5" style="text-align:center;">Data tidak ditemukan.</td></tr>';
+                        html = '<tr><td colspan="5" style="text-align:center; padding: 20px;">Data pengguna tidak ditemukan.</td></tr>';
                     } else {
                         data.users.forEach(user => {
+                            // 1. LOGIKA CHECKBOX
                             const checkboxHtml = (user.user_id != currentUserId) 
-                                ? `<input type="checkbox" class="user-checkbox" value="${user.user_id}" style="transform: scale(1.2); cursor: pointer;">` : '';
-                            const deleteBtnHtml = (user.user_id != currentUserId)
-                                ? `<button type="button" class="btn btn-danger btn-sm btn-delete" data-url="${baseUrl}admin/deleteUser/${user.user_id}">Hapus</button>` : '';
+                                ? `<input type="checkbox" class="user-checkbox" value="${user.user_id}" style="transform: scale(1.2); cursor: pointer;">` 
+                                : '';
 
-                            html += `<tr><td style="text-align: center;">${checkboxHtml}</td><td>${user.nama_lengkap}</td><td>${user.email}</td><td><span style="text-transform: capitalize; font-weight: bold;">${user.role}</span></td><td><a href="${baseUrl}admin/editUser/${user.user_id}" class="btn btn-warning btn-sm">Edit</a> ${deleteBtnHtml}</td></tr>`;
+                            // 2. LOGIKA ROLE BADGE
+                            let roleStyle = '';
+                            if(user.role === 'admin') roleStyle = 'color: #7c3aed; background: #f3e8ff; border: 1px solid #d8b4fe;';
+                            else if(user.role === 'staff') roleStyle = 'color: #059669; background: #ecfdf5; border: 1px solid #6ee7b7;';
+                            else if(user.role === 'pemilik') roleStyle = 'color: #d97706; background: #fffbeb; border: 1px solid #fde68a;';
+                            else roleStyle = 'color: #4b5563; background: #f3f4f6; border: 1px solid #d1d5db;';
+                            
+                            const roleBadge = `<span style="text-transform: capitalize; font-weight: 700; font-size: 0.8rem; padding: 4px 10px; border-radius: 20px; ${roleStyle}">${user.role}</span>`;
+
+                            // --- 3. LOGIKA TOMBOL UNLOCK (BARU) ---
+                            let lockedBadge = '';
+                            let unlockBtn = '';
+
+                            if (user.is_locked == 1) {
+                                lockedBadge = `<span class="badge-locked"><i class="ph ph-lock-key"></i> TERKUNCI</span>`;
+                                unlockBtn = `
+                                    <a href="${baseUrl}admin/unlockUser/${user.user_id}" 
+                                       class="btn-icon unlock" 
+                                       title="Buka Kunci Akun"
+                                       onclick="return confirm('Buka kunci akun ini?');">
+                                        <i class="ph ph-lock-key-open"></i>
+                                    </a>
+                                `;
+                            }
+                            // ---------------------------------------
+
+                            const editBtn = `
+                                <a href="${baseUrl}admin/editUser/${user.user_id}" class="btn-icon edit" title="Edit">
+                                    <i class="ph ph-pencil-simple"></i>
+                                </a>
+                            `;
+
+                            let deleteBtn = '';
+                            if (user.user_id != currentUserId) {
+                                deleteBtn = `
+                                    <button type="button" class="btn-icon delete btn-delete" data-url="${baseUrl}admin/deleteUser/${user.user_id}" title="Hapus">
+                                        <i class="ph ph-trash"></i>
+                                    </button>
+                                `;
+                            }
+
+                            html += `
+                                <tr>
+                                    <td style="text-align: center;">${checkboxHtml}</td>
+                                    <td>
+                                        <strong>${user.nama_lengkap}</strong>
+                                        ${lockedBadge} 
+                                    </td>
+                                    <td style="color: #666;">${user.email}</td>
+                                    <td>${roleBadge}</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            ${unlockBtn}
+                                            ${editBtn}
+                                            ${deleteBtn}
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
                         });
                     }
                     
@@ -148,17 +207,85 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        // --- REVISI: MODAL IMPORT USER (STYLE BARU) ---
         const btnImport = document.querySelector('.btn-import-users');
         if (btnImport) {
             btnImport.addEventListener('click', function() {
                 const url = this.dataset.url;
+                
                 Swal.fire({
                     title: 'Import Data Pengguna',
-                    html: `<form id="formImport" action="${url}" method="POST" enctype="multipart/form-data"><p style="font-size:0.9em; color:#666; margin-bottom:15px;">Upload file CSV dengan urutan kolom:<br><b>Nama Lengkap, Email, Password, Role</b></p><input type="file" name="csv_file" class="swal2-file" accept=".csv" required></form>`,
-                    showCancelButton: true, confirmButtonText: 'Upload & Import',
+                    html: `
+                        <form id="formImportUser" action="${url}" method="POST" enctype="multipart/form-data">
+                            <div class="import-instruction-box">
+                                <strong>Format Kolom CSV (Urutan Wajib):</strong>
+                                <ul>
+                                    <li>1. Nama Lengkap</li>
+                                    <li>2. Email (Login)</li>
+                                    <li>3. Tanggal Lahir (YYYY-MM-DD)</li> 
+                                    <li>4. Role (admin, staff, pemilik, peminjam)</li>
+                                </ul>
+                                <small style="color: #d97706; display:block; margin-top:5px;">
+                                    *Password otomatis dibuat dari tanggal lahir (Format: DDMMYYYY).
+                                </small>
+                            </div>
+                            
+                            <div class="custom-file-upload" id="dropZoneUser">
+                                <input type="file" name="csv_file" id="csvFileInputUser" class="hidden-input-file" accept=".csv" required>
+                                <i class="ph ph-file-csv"></i>
+                                <span class="main-text">Klik atau Tarik File CSV ke Sini</span>
+                                <span class="sub-text">Maksimal ukuran file 2MB</span>
+                            </div>
+                            
+                            <div id="fileNameDisplayUser" class="selected-file-name"></div>
+                        </form>
+                    `,
+                    
+                    showCancelButton: true,
+                    confirmButtonText: 'Upload & Import',
+                    cancelButtonText: 'Batal',
+                    
+                    confirmButtonColor: '#152e4d', // Biru Tua (Simpan)
+                    cancelButtonColor: '#f8c21a',  // Kuning (Batal)
+                    
+                    reverseButtons: true,
+                    
+                    // --- BAGIAN INI YANG MENGUBAH WARNA TEKS ---
+                    didOpen: () => {
+                        // 1. Ambil tombol Batal
+                        const cancelBtn = Swal.getCancelButton();
+                        if (cancelBtn) {
+                            cancelBtn.style.color = '#152e4d'; // Ubah teks jadi Biru Tua
+                            cancelBtn.style.fontWeight = 'bold'; // Biar lebih tegas terbaca
+                        }
+
+                        // 2. Logika Upload File (Seperti sebelumnya)
+                        const fileInput = document.getElementById('csvFileInputUser');
+                        const fileNameDisplay = document.getElementById('fileNameDisplayUser');
+                        const dropZone = document.getElementById('dropZoneUser');
+                        const mainText = dropZone.querySelector('.main-text');
+
+                        fileInput.addEventListener('change', function() {
+                            if (this.files && this.files.length > 0) {
+                                const name = this.files[0].name;
+                                fileNameDisplay.innerHTML = `📄 File terpilih: <strong>${name}</strong>`;
+                                fileNameDisplay.style.display = 'block';
+                                
+                                dropZone.style.borderColor = '#10b981';
+                                dropZone.style.backgroundColor = '#ecfdf5';
+                                dropZone.querySelector('i').style.color = '#10b981';
+                                mainText.innerText = "Ganti File?";
+                            }
+                        });
+                    },
+
                     preConfirm: () => {
-                        const form = document.getElementById('formImport');
-                        if (!form.querySelector('input[type="file"]').files[0]) { Swal.showValidationMessage('Silakan pilih file CSV dulu!'); return false; }
+                        const form = document.getElementById('formImportUser');
+                        const fileInput = document.getElementById('csvFileInputUser');
+                        if (!fileInput.files.length) {
+                            Swal.showValidationMessage('⚠️ Silakan pilih file CSV terlebih dahulu!');
+                            return false;
+                        }
                         form.submit();
                     }
                 });
@@ -257,58 +384,249 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /* =========================================
-       4. FITUR REKAP ABSENSI (ADMIN)
+       4. FITUR REKAP ABSENSI (ADMIN) - LIVE SEARCH & FILTER
        ========================================= */
-    const searchInputAbsensi = document.getElementById('searchAbsensi');
-    if (searchInputAbsensi) {
-        const filterStatus = document.getElementById('filterStatus');
-        const filterMonth = document.getElementById('filterMonth');
-        const filterYear = document.getElementById('filterYear');
+    
+    // Definisikan fungsi secara global agar bisa dipanggil oleh tombol Preset (setPeriod)
+    // Definisikan fungsi secara global agar bisa dipanggil oleh tombol Preset (setPeriod)
+    window.loadAbsensiGlobal = function(page = 1) {
+        const searchInput = document.getElementById('searchAbsensi');
+        if (!searchInput) return; // Hentikan jika bukan di halaman absensi
+
+        const baseUrl = searchInput.dataset.baseUrl;
         const tableBody = document.getElementById('absensiTableBody');
         const paginationContainer = document.querySelector('.pagination-container');
-        const baseUrl = searchInputAbsensi.dataset.baseUrl;
 
-        function loadAbsensi(page = 1) {
-            if (typeof page !== 'number' || isNaN(page) || page < 1) page = 1;
-            let monthVal = filterMonth.value;
-            let yearVal = filterYear.value;
-            if (searchInputAbsensi.value.trim() !== '' || filterStatus.value !== '') {
-                monthVal = ''; yearVal = '';
-            }
-            const params = new URLSearchParams({
-                ajax: 1, page: page, search: searchInputAbsensi.value,
-                status: filterStatus.value, month: monthVal, year: yearVal
-            });
+        // 1. Deteksi Mode (Harian atau Laporan) dari URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const mode = urlParams.get('mode') || 'harian';
 
-            if(tableBody) tableBody.style.opacity = '0.5';
-            fetch(`${baseUrl}admin/rekapAbsensi?${params.toString()}`).then(res => res.json()).then(data => {
+        // 2. Ambil Nilai Filter
+        const filterStatus = document.getElementById('filterStatus');
+        const filterRole = document.getElementById('filterRole'); 
+        const filterDate = document.getElementById('datePickerNative');
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        const filterRoleLaporan = document.getElementById('filterRoleLaporan'); 
+
+        // 3. Susun Parameter
+        let params = new URLSearchParams({
+            ajax: 1,
+            page: page,
+            mode: mode,
+            search: searchInput.value
+        });
+
+        if (mode === 'harian') {
+            if (filterStatus) params.append('status', filterStatus.value);
+            if (filterRole) params.append('role', filterRole.value);
+            if (filterDate) params.append('date', filterDate.value);
+        } else {
+            if (startDateInput) params.append('start_date', startDateInput.value);
+            if (endDateInput) params.append('end_date', endDateInput.value);
+            if (filterRoleLaporan) params.append('role', filterRoleLaporan.value);
+        }
+
+        // 4. Efek Loading & Fetch Data
+        if(tableBody) tableBody.style.opacity = '0.5';
+
+        fetch(`${baseUrl}admin/rekapAbsensi?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => {
                 let html = '';
+
                 if (data.absensi.length === 0) {
-                    html = '<tr><td colspan="7" style="text-align:center;">Data tidak ditemukan.</td></tr>';
+                    html = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#999;">Data tidak ditemukan.</td></tr>';
                 } else {
                     data.absensi.forEach(absen => {
-                        let statusClass = 'status-gray';
-                        if (absen.status === 'Hadir') statusClass = 'status-green';
-                        else if (absen.status === 'Masih Bekerja') statusClass = 'status-green';
-                        else if (absen.status === 'Sakit') statusClass = 'status-red';
-                        else if (absen.status === 'Izin') statusClass = 'status-orange';
-                        const safeKet = absen.keterangan ? absen.keterangan.replace(/'/g, "&#39;") : '';
-                        const btnEdit = `<button class="btn btn-warning btn-sm" onclick="editAbsenPopup('${absen.absen_id}', '${absen.nama_lengkap}', '${absen.waktu_masuk}', '${absen.waktu_pulang}', '${absen.status}', '${safeKet}')">Edit</button>`;
-                        let buktiHtml = absen.bukti_foto ? `<br><a href="${baseUrl}../public/uploads/bukti_absen/${absen.bukti_foto}" target="_blank" class="link-bukti">(Lihat Bukti)</a>` : '';
-                        html += `<tr><td>${absen.tanggal}</td><td>${absen.nama_lengkap}</td><td>${absen.waktu_masuk}</td><td>${absen.waktu_pulang}</td><td>${absen.total_jam}</td><td><span class="${statusClass}">${absen.status}</span>${buktiHtml}</td><td class="no-print">${btnEdit}</td></tr>`;
+                        
+                        // --- Logic Status ---
+                        let statusStyle = 'background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;';
+                        let statusText = absen.status; 
+
+                        // Ambil tanggal hari ini dalam format YYYY-MM-DD (sesuai format database)
+                        const todayDate = new Date().toISOString().split('T')[0];
+
+                        if (absen.status === 'Hadir') {
+                            // Default style Hadir (Hijau)
+                            statusStyle = 'background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;';
+                            statusText = 'Hadir';
+
+                            // Cek apakah belum pulang
+                            if ((!absen.waktu_pulang || absen.waktu_pulang === '-') && absen.waktu_masuk) {
+                                
+                                // [LOGIKA BARU]: Hanya tampilkan "Masih Bekerja" jika tanggalnya HARI INI
+                                if (absen.tanggal === todayDate) {
+                                    statusText = 'Masih Bekerja';
+                                    statusStyle = 'background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;'; // Biru
+                                } 
+                                // Jika tanggal lampau, biarkan tetap "Hadir" (Hijau) meskipun waktu pulang kosong
+                            }
+                        } else if (absen.status === 'Sakit') {
+                            statusStyle = 'background:#fef2f2; color:#dc2626; border:1px solid #fecaca;';
+                        } else if (absen.status === 'Izin') {
+                            statusStyle = 'background:#fffbeb; color:#d97706; border:1px solid #fde68a;';
+                            statusText = 'Izin / Cuti';
+                        } else if (absen.status === 'Alpa') {
+                             statusStyle = 'background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;';
+                             statusText = 'Tanpa Keterangan';
+                        }
+
+                        // --- Logic Role Badge ---
+                        const roleRaw = (absen.role || '').toLowerCase();
+                        let roleBadgeStyle = 'background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;';
+                        if(roleRaw == 'admin') roleBadgeStyle = 'background:#f3e8ff; color:#7c3aed; border:1px solid #d8b4fe;';
+                        if(roleRaw == 'staff') roleBadgeStyle = 'background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;';
+                        if(roleRaw == 'pemilik') roleBadgeStyle = 'background:#fffbeb; color:#d97706; border:1px solid #fde68a;';
+                        if(roleRaw == 'peminjam') roleBadgeStyle = 'background:#f3f4f6; color:#4b5563; border:1px solid #d1d5db;';
+
+                        // --- Helper Clean String ---
+                        const escapeHtml = (str) => {
+                            if (!str) return '';
+                            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+                        };
+
+                        // --- Logic Keterangan (Tombol Lihat) ---
+                        let keteranganHtml = '<span style="color:#ccc;">-</span>';
+                        if (absen.keterangan && absen.keterangan.trim() !== '' && absen.keterangan !== '-') {
+                            const rawKet = absen.keterangan.replace(/[\r\n]+/g, " ").replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+                            keteranganHtml = `
+                                <button type="button" class="btn btn-sm btn-info" 
+                                    onclick="showDetailKeterangan('${rawKet}')"
+                                    style="background-color: #e0f2fe; color: #0ea5e9; border: 1px solid #bae6fd; padding: 2px 10px; font-size: 0.75rem; border-radius: 20px; font-weight: 600;">
+                                    <i class="ph ph-eye"></i> Lihat
+                                </button>`;
+                        }
+
+                        // --- RENDER ROW BERDASARKAN MODE ---
+                        if (mode === 'laporan') {
+                            // Tampilan Tab Riwayat Laporan (Simple)
+                            html += `
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 15px; color: #334155;">${absen.tanggal}</td>
+                                <td style="padding: 15px; color: #152e4d;"><strong>${absen.nama_lengkap}</strong></td>
+                                <td style="padding: 15px;"><span style="padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; ${roleBadgeStyle}">${absen.role}</span></td>
+                                <td style="padding: 15px; color: #444;">${absen.waktu_masuk || '-'}</td>
+                                <td style="padding: 15px; color: #444;">${absen.waktu_pulang || '-'}</td>
+                                <td style="padding: 15px;"><span style="padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; ${statusStyle}">${statusText}</span></td>
+                                <td style="padding: 15px; text-align:center;">${keteranganHtml}</td>
+                            </tr>`;
+                        
+                        } else {
+                            // Tampilan Tab Monitoring Harian (Lengkap dengan Bukti & Edit)
+                            let buktiHtml = '<span style="color: #cbd5e1;">-</span>';
+                            if (absen.bukti_foto) {
+                                buktiHtml = `<a href="${baseUrl}../public/uploads/bukti_absen/${absen.bukti_foto}" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; text-decoration: none; color: #2563eb; font-weight: 600; font-size: 0.85rem; background: #eff6ff; padding: 4px 8px; border-radius: 6px;"><i class="ph ph-file-text"></i> Lihat File</a>`;
+                            }
+
+                            const jamMasukRaw = absen.waktu_masuk && absen.waktu_masuk !== '-' ? absen.waktu_masuk.substring(0,5) : '';
+                            const jamPulangRaw = absen.waktu_pulang && absen.waktu_pulang !== '-' ? absen.waktu_pulang.substring(0,5) : '';
+                            const safeNamaAttr = escapeHtml(absen.nama_lengkap);
+                            const safeKetAttr = escapeHtml(absen.keterangan);
+
+                            const btnEdit = `<button type="button" class="btn-icon edit btn-edit-manual" 
+                                data-id="${absen.absen_id}" 
+                                data-nama="${safeNamaAttr}" 
+                                data-masuk="${jamMasukRaw}" 
+                                data-pulang="${jamPulangRaw}" 
+                                data-status="${absen.status}" 
+                                data-ket="${safeKetAttr}">
+                                <i class="ph ph-pencil-simple"></i>
+                            </button>`;
+
+                            html += `
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 15px; color: #334155;">${absen.tanggal}</td>
+                                <td style="padding: 15px; color: #152e4d;"><strong>${absen.nama_lengkap}</strong></td>
+                                <td style="padding: 15px;"><span style="padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; ${roleBadgeStyle}">${absen.role}</span></td>
+                                <td style="padding: 15px; color: #444;">${absen.waktu_masuk || '-'}</td>
+                                <td style="padding: 15px; color: #444;">${absen.waktu_pulang || '-'}</td>
+                                <td style="padding: 15px; color: #444;">${absen.total_jam || '-'}</td>
+                                <td style="padding: 15px;"><span style="padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; ${statusStyle}">${statusText}</span></td>
+                                <td style="padding: 15px;">${buktiHtml}</td>
+                                <td class="no-print" style="text-align: center;">${btnEdit}</td>
+                            </tr>`;
+                        }
                     });
                 }
-                if(tableBody) { tableBody.innerHTML = html; tableBody.style.opacity = '1'; }
-                renderPaginationUniversal(paginationContainer, data.totalPages, data.currentPage, (p) => loadAbsensi(p));
+
+                if(tableBody) { 
+                    tableBody.innerHTML = html; 
+                    tableBody.style.opacity = '1'; 
+                }
+                if(paginationContainer) {
+                    renderPaginationUniversal(paginationContainer, data.totalPages, data.currentPage, (p) => window.loadAbsensiGlobal(p));
+                }
+            })
+            .catch(err => {
+                console.error("Error fetching absensi:", err);
+                if(tableBody) {
+                    tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:red;">Terjadi kesalahan saat memuat data.</td></tr>';
+                    tableBody.style.opacity = '1';
+                }
             });
-        }
-        searchInputAbsensi.addEventListener('input', () => loadAbsensi(1));
-        filterStatus.addEventListener('change', () => loadAbsensi(1));
-        filterMonth.addEventListener('change', () => loadAbsensi(1));
-        filterYear.addEventListener('change', () => loadAbsensi(1));
+    };
+
+    // --- Inisialisasi Event Listener (Saat Halaman Dimuat) ---
+    const searchInput = document.getElementById('searchAbsensi');
+    
+    if (searchInput) {
+        // 1. Listener Search (Ketik)
+        searchInput.addEventListener('input', () => window.loadAbsensiGlobal(1));
+
+        // 2. Listener Filter Harian
+        const filterRole = document.getElementById('filterRole');
+        const filterStatus = document.getElementById('filterStatus');
+        if(filterRole) filterRole.addEventListener('change', () => window.loadAbsensiGlobal(1));
+        if(filterStatus) filterStatus.addEventListener('change', () => window.loadAbsensiGlobal(1));
+
+        // 3. Listener Filter Laporan (Date Picker & Role Laporan)
+        const startDate = document.getElementById('startDate');
+        const endDate = document.getElementById('endDate');
+        const filterRoleLaporan = document.getElementById('filterRoleLaporan');
+
+        if(startDate) startDate.addEventListener('change', () => window.loadAbsensiGlobal(1));
+        if(endDate) endDate.addEventListener('change', () => window.loadAbsensiGlobal(1));
+        if(filterRoleLaporan) filterRoleLaporan.addEventListener('change', () => window.loadAbsensiGlobal(1));
         
-        if(paginationContainer){ paginationContainer.addEventListener('click', (e) => { if(e.target.classList.contains('page-link')){ e.preventDefault(); const p = e.target.parentElement; if(!p.classList.contains('disabled') && !p.classList.contains('active')) loadAbsensi(parseInt(e.target.dataset.page)); } }); }
+        // 4. Listener & Render Pagination Awal
+    const pagContainer = document.querySelector('.pagination-container');
+    if(pagContainer) {
+         // A. Event Listener untuk Klik Tombol
+         pagContainer.addEventListener('click', (e) => { 
+            if(e.target.classList.contains('page-link')){ 
+                e.preventDefault(); 
+                const p = e.target.parentElement; 
+                if(!p.classList.contains('disabled') && !p.classList.contains('active')) {
+                    window.loadAbsensiGlobal(parseInt(e.target.dataset.page)); 
+                }
+            } 
+        }); 
+
+        // B. [PERBAIKAN] Render Tombol Saat Halaman Pertama Dimuat
+        // Ambil data total halaman dari atribut PHP data-total-pages
+        const initTotal = parseInt(pagContainer.dataset.totalPages) || 1;
+        const initCurrent = parseInt(pagContainer.dataset.currentPage) || 1;
+        
+        // Panggil fungsi render
+        if (typeof renderPaginationUniversal === 'function') {
+            renderPaginationUniversal(pagContainer, initTotal, initCurrent, (p) => window.loadAbsensiGlobal(p));
+        }
     }
+    }
+
+    document.addEventListener('click', function(e) {
+    // Cek apakah yang diklik adalah tombol edit (atau icon di dalamnya)
+    const btn = e.target.closest('.btn-edit-manual');
+    
+    if (btn) {
+        // Ambil data dari atribut data-*
+        const d = btn.dataset;
+        
+        // Panggil fungsi popup dengan data yang bersih
+        editAbsenPopup(d.id, d.nama, d.masuk, d.pulang, d.status, d.ket);
+    }
+});
 
     /* =========================================
        5. FITUR KONFIGURASI DATA MASTER (ADMIN) - [FIXED PAGINATION]
@@ -522,37 +840,181 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /* =========================================
-       6. FITUR PROFIL (HISTORY)
+       6. FITUR PROFIL (HISTORY) - GLOBAL DELEGATION FIX
        ========================================= */
-    const filterMonthProfile = document.getElementById('filterMonthProfile');
-    if (filterMonthProfile) {
-        const filterYearProfile = document.getElementById('filterYearProfile');
+    const startDateProfile = document.getElementById('startDateProfile');
+    
+    // Kita cek apakah elemen ini ada, menandakan kita sedang di halaman Profil
+    if (startDateProfile) {
+        const endDateProfile = document.getElementById('endDateProfile');
         const historyBody = document.getElementById('historyTableBody');
         const formHistory = document.getElementById('formHistory');
         const baseUrl = formHistory.dataset.baseUrl;
-        function loadMyHistory(page = 1) {
-            const params = new URLSearchParams({ ajax: 1, page: page, month: filterMonthProfile.value, year: filterYearProfile.value });
+        const pagContainerProfile = document.getElementById('paginationContainerHistory'); 
+        
+        // A. Fungsi Render Pagination (HTML Only)
+        function renderLocalPagination(totalPages, currentPage) {
+            if (!pagContainerProfile) return;
+            
+            totalPages = parseInt(totalPages) || 1;
+            currentPage = parseInt(currentPage) || 1;
+            
+            let html = '<nav><ul class="pagination">';
+            
+            // Prev
+            const prevDisabled = currentPage === 1 ? 'disabled' : '';
+            html += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a></li>`;
+            
+            // Numbers
+            let start = Math.max(1, currentPage - 2);
+            let end = Math.min(totalPages, currentPage + 2);
+            if (totalPages <= 5) { start = 1; end = totalPages; }
+            
+            for (let i = start; i <= end; i++) {
+                const active = i === currentPage ? 'active' : '';
+                html += `<li class="page-item ${active}"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
+            }
+            
+            // Next
+            const nextDisabled = currentPage === totalPages ? 'disabled' : '';
+            html += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" data-page="${currentPage + 1}">Next</a></li>`;
+            
+            html += '</ul></nav>';
+            pagContainerProfile.innerHTML = html;
+        }
+
+        // B. Fungsi Load History (AJAX)
+        window.loadMyHistory = function(page = 1) {
+            const params = new URLSearchParams({ 
+                ajax: 1, 
+                page: page, 
+                start_date: startDateProfile.value, 
+                end_date: endDateProfile.value 
+            });
+            
             if(historyBody) historyBody.style.opacity = '0.5';
-            fetch(`${baseUrl}profile/absensi?${params.toString()}`).then(res => res.json()).then(data => {
+
+            fetch(`${baseUrl}profile/absensi?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => {
                 let html = '';
-                if (data.absensi.length === 0) { html = '<tr><td colspan="6" style="text-align:center;">Belum ada data absensi bulan ini.</td></tr>'; } 
-                else {
+                if (data.absensi.length === 0) { 
+                    html = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: #999;">Tidak ada data absensi pada periode ini.</td></tr>'; 
+                } else {
                     data.absensi.forEach(absen => {
-                        let color = 'gray';
-                        if(absen.display_status === 'Hadir' || absen.display_status === 'Masih Bekerja') color = 'green';
-                        else if(absen.status_raw === 'Sakit') color = 'red';
-                        else if(absen.status_raw === 'Izin') color = 'orange';
-                        let colKet = absen.keterangan;
-                        if (absen.bukti_foto) { colKet = `<a href="${baseUrl}../public/uploads/bukti_absen/${absen.bukti_foto}" target="_blank" style="text-decoration: underline; color: blue;">Lihat Bukti</a>`; }
-                        html += `<tr><td>${absen.tanggal}</td><td>${absen.waktu_masuk}</td><td>${absen.waktu_pulang}</td><td>${absen.total_jam}</td><td><span style="font-weight:bold; color:${color}">${absen.display_status}</span></td><td>${colKet}</td></tr>`;
+                        // ... (Bagian render baris tabel SAMA seperti sebelumnya, tidak diubah) ...
+                        // Copy paste logika status/html baris dari kode sebelumnya di sini
+                        let statusStyle = 'background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;';
+                        let statusText = absen.status_raw;
+                        if (absen.status_raw === 'Hadir') {
+                            statusStyle = 'background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;';
+                            statusText = 'Hadir';
+                            if (absen.display_status === 'Masih Bekerja') {
+                                statusText = 'Masih Bekerja';
+                                statusStyle = 'background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;';
+                            }
+                        } else if (absen.status_raw === 'Sakit') {
+                            statusStyle = 'background:#fef2f2; color:#dc2626; border:1px solid #fecaca;';
+                        } else if (absen.status_raw === 'Izin') {
+                            statusStyle = 'background:#fffbeb; color:#d97706; border:1px solid #fde68a;';
+                            statusText = 'Izin / Cuti';
+                        } else if (absen.status_raw === 'Alpa') {
+                             statusStyle = 'background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;';
+                             statusText = 'Tanpa Keterangan';
+                        }
+                        let colKet = `<span style="font-size: 0.85rem; color: #64748b;">${absen.keterangan}</span>`;
+                        if (absen.bukti_foto) { 
+                            colKet = `<a href="${baseUrl}../public/uploads/bukti_absen/${absen.bukti_foto}" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; text-decoration: none; color: #2563eb; font-weight: 600; font-size: 0.85rem; background: #eff6ff; padding: 4px 8px; border-radius: 6px;"><i class="ph ph-file-text"></i> Lihat Bukti</a>`; 
+                        }
+                        html += `
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 15px; color: #334155;">${absen.tanggal}</td>
+                            <td style="padding: 15px; color: #444;">${absen.waktu_masuk}</td>
+                            <td style="padding: 15px; color: #444;">${absen.waktu_pulang}</td>
+                            <td style="padding: 15px; color: #444;">${absen.total_jam}</td>
+                            <td style="padding: 15px;">
+                                <span style="padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; ${statusStyle}">${statusText}</span>
+                            </td>
+                            <td style="padding: 15px;">${colKet}</td>
+                        </tr>`;
                     });
                 }
-                if(historyBody) { historyBody.innerHTML = html; historyBody.style.opacity = '1'; }
-            });
+                
+                if(historyBody) { 
+                    historyBody.innerHTML = html; 
+                    historyBody.style.opacity = '1'; 
+                }
+
+                // Render tombol paginasi baru
+                renderLocalPagination(data.totalPages, data.currentPage);
+            })
+            .catch(err => console.error(err));
+        };
+
+        // C. Init & Listeners Input Tanggal
+        window.setPeriodProfile = function(type) { /* ...Logika Sama... */ 
+            const today = new Date();
+            let start = new Date();
+            let end = new Date();
+            if (type === 'today') { } 
+            else if (type === 'this_week') {
+                const day = today.getDay(); 
+                const diff = today.getDate() - day + (day === 0 ? -6 : 1); 
+                start.setDate(diff); end.setDate(diff + 6);
+            } 
+            else if (type === 'this_month') {
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            } 
+            else if (type === 'last_month') {
+                start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                end = new Date(today.getFullYear(), today.getMonth(), 0);
+            }
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            startDateProfile.value = formatDate(start);
+            endDateProfile.value = formatDate(end);
+            loadMyHistory(1);
+        };
+
+        startDateProfile.addEventListener('change', () => loadMyHistory(1));
+        endDateProfile.addEventListener('change', () => loadMyHistory(1));
+        
+        // D. Initial Render
+        if(pagContainerProfile) {
+            const initTotal = parseInt(pagContainerProfile.dataset.totalPages) || 1;
+            const initCurrent = parseInt(pagContainerProfile.dataset.currentPage) || 1;
+            renderLocalPagination(initTotal, initCurrent);
         }
-        filterMonthProfile.addEventListener('change', () => loadMyHistory(1));
-        filterYearProfile.addEventListener('change', () => loadMyHistory(1));
     }
+
+    // [PENTING] GLOBAL CLICK LISTENER (DI LUAR IF)
+    // Ini dipasang di 'document' agar menangkap klik di manapun, 
+    // tapi hanya bereaksi jika yang diklik adalah tombol paginasi history.
+    document.addEventListener('click', function(e) {
+        // Cek apakah target klik ada di dalam #paginationContainerHistory DAN punya class .page-link
+        const targetLink = e.target.closest('#paginationContainerHistory .page-link');
+        
+        if (targetLink) {
+            e.preventDefault();
+            const li = targetLink.parentElement;
+            
+            // Cek status disabled/active
+            if (!li.classList.contains('disabled') && !li.classList.contains('active')) {
+                const page = parseInt(targetLink.getAttribute('data-page'));
+                if (page && !isNaN(page)) {
+                    // Panggil fungsi global yang sudah kita definisikan di atas
+                    if (typeof window.loadMyHistory === 'function') {
+                        window.loadMyHistory(page);
+                    }
+                }
+            }
+        }
+    });
 
     /* =========================================
        7. FITUR DOWNLOAD PDF
@@ -567,22 +1029,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    /* =========================================
-       8. FITUR GLOBAL DELETE (Universal)
-       ========================================= */
-    document.body.addEventListener('click', function(e) {
-        if (e.target.classList.contains('btn-delete')) {
-            e.preventDefault(); 
-            const deleteUrl = e.target.getAttribute('data-url');
-            if (!deleteUrl) return;
-            Swal.fire({
-                title: 'Apakah Anda Yakin?', text: "Data yang dihapus tidak dapat dikembalikan!",
-                icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) window.location.href = deleteUrl;
-            });
-        }
-    });
 
     /* =========================================
        10. FITUR RIWAYAT MASUK (ADMIN) - [LIVE SEARCH & DATE]
@@ -1477,12 +1923,42 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function handleBulkDelete(ids, url, onSuccessCallback) {
     if (ids.length === 0) return;
+
     Swal.fire({
-        title: `Hapus ${ids.length} Data?`, text: "Data yang dihapus tidak bisa dikembalikan!",
-        icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Ya, Hapus!'
+        title: `Hapus ${ids.length} Data Terpilih?`, 
+        text: "Data yang dihapus tidak bisa dikembalikan!",
+        icon: 'warning', 
+        
+        // --- STYLE DISAMAKAN ---
+        iconColor: '#152e4d',          // Ikon (!) Biru Tua
+        confirmButtonColor: '#152e4d', // Tombol Ya Biru Tua
+        cancelButtonColor: '#f8c21a',  // Tombol Batal Kuning
+        
+        showCancelButton: true, 
+        confirmButtonText: 'Ya, Hapus!',
+        cancelButtonText: 'Batal',
+        
+        // Styling teks tombol Batal
+        didOpen: () => {
+            const cancelBtn = Swal.getCancelButton();
+            if (cancelBtn) {
+                cancelBtn.style.color = '#152e4d';
+                cancelBtn.style.fontWeight = 'bold';
+            }
+        }
     }).then((result) => {
         if (result.isConfirmed) {
-            Swal.fire({title: 'Memproses...', didOpen: () => Swal.showLoading()});
+            // Tampilkan loading saat proses penghapusan berjalan
+            Swal.fire({
+                title: 'Memproses...',
+                text: 'Mohon tunggu sebentar.',
+                allowOutsideClick: false,
+                showConfirmButton: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
             fetch(url, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -1491,14 +1967,29 @@ function handleBulkDelete(ids, url, onSuccessCallback) {
             .then(res => res.json())
             .then(data => {
                 if(data.success) {
-                    Swal.fire('Berhasil', data.message, 'success').then(() => onSuccessCallback());
+                    Swal.fire({
+                        title: 'Berhasil',
+                        text: data.message,
+                        icon: 'success',
+                        confirmButtonColor: '#152e4d'
+                    }).then(() => onSuccessCallback());
                 } else {
-                    Swal.fire('Gagal', data.message, 'error');
+                    Swal.fire({
+                        title: 'Gagal',
+                        text: data.message,
+                        icon: 'error',
+                        confirmButtonColor: '#152e4d'
+                    });
                 }
             })
             .catch(err => {
                 console.error(err);
-                Swal.fire('Error', 'Terjadi kesalahan server.', 'error');
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Terjadi kesalahan server.',
+                    icon: 'error',
+                    confirmButtonColor: '#152e4d'
+                });
             });
         }
     });
@@ -1507,73 +1998,252 @@ function handleBulkDelete(ids, url, onSuccessCallback) {
 function editAbsenPopup(id, nama, masuk, pulang, status, keterangan) {
     const template = document.getElementById('templateEditAbsenAdmin');
     if(!template) return;
+    
     const searchElem = document.getElementById('searchAbsensi');
     const baseUrl = searchElem ? searchElem.dataset.baseUrl : '';
     
     Swal.fire({
-        title: 'Edit Data Absensi', html: template.innerHTML, showCancelButton: true, confirmButtonText: 'Simpan Perubahan',
+        title: 'Edit Data Absensi', 
+        html: template.innerHTML, 
+        showCancelButton: true, 
+        confirmButtonText: '<i class="ph ph-floppy-disk"></i> Simpan Perubahan',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#152e4d', 
+        cancelButtonColor: '#f8c21a',
+        
         didOpen: () => {
             const popup = Swal.getPopup();
-            popup.querySelector('#formEditAbsen').action = baseUrl + 'admin/updateAbsensiManual';
+            const form = popup.querySelector('form');
+            form.action = baseUrl + 'admin/updateAbsensiManual';
+            
+            // Isi data awal
             popup.querySelector('#edit_absen_id').value = id;
             popup.querySelector('#edit_nama').value = nama;
             popup.querySelector('#edit_status').value = (status === 'Masih Bekerja') ? 'Hadir' : status;
-            if(masuk && masuk !== '-' && masuk !== 'null') popup.querySelector('#edit_masuk').value = masuk;
-            if(pulang && pulang !== '-' && pulang !== 'null') popup.querySelector('#edit_pulang').value = pulang;
-            if(keterangan && keterangan !== 'null') popup.querySelector('#edit_keterangan').value = keterangan;
+            if(masuk && masuk.trim() !== '-') popup.querySelector('#edit_masuk').value = masuk;
+            if(pulang && pulang.trim() !== '-') popup.querySelector('#edit_pulang').value = pulang;
+            if(keterangan && keterangan !== 'null' && keterangan !== '-') popup.querySelector('#edit_keterangan').value = keterangan;
+
+            // Style Tombol Cancel
+            const cancelBtn = Swal.getCancelButton();
+            if (cancelBtn) {
+                cancelBtn.style.color = '#152e4d';
+                cancelBtn.style.fontWeight = 'bold';
+            }
+
+            // --- FITUR DRAG & DROP + PREVIEW NAMA FILE ---
+            const dropZone = popup.querySelector('#drop_zone_area');
+            const fileInput = popup.querySelector('#input_bukti_file');
+            const labelFile = popup.querySelector('#label_file_name');
+
+            // 1. Jika user KLIK dan pilih file
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    labelFile.innerHTML = `<strong>File Terpilih:</strong> ${this.files[0].name}`;
+                    labelFile.style.color = '#152e4d';
+                    dropZone.style.borderColor = '#152e4d';
+                    dropZone.style.backgroundColor = '#e0f2fe';
+                }
+            });
+
+            // 2. Efek saat file DI-SERET masuk area (Drag Over)
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = '#152e4d';
+                dropZone.style.backgroundColor = '#e0f2fe'; // Biru muda
+                labelFile.innerText = "Lepaskan file di sini...";
+            });
+
+            // 3. Efek saat file KELUAR area (Drag Leave)
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = '#cbd5e1';
+                dropZone.style.backgroundColor = '#f8fafc'; // Putih abu
+                labelFile.innerText = "Klik atau Seret File ke Sini (JPG/PNG/PDF)";
+            });
+
+            // 4. Saat file DI-JATUHKAN (Drop)
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    // Masukkan file yang di-drop ke dalam input file
+                    fileInput.files = files;
+                    
+                    // Update Teks Label
+                    labelFile.innerHTML = `<strong>File Terpilih:</strong> ${files[0].name}`;
+                    labelFile.style.color = '#152e4d';
+                    
+                    // Pertahankan warna background aktif
+                    dropZone.style.borderColor = '#152e4d';
+                    dropZone.style.backgroundColor = '#e0f2fe';
+                }
+            });
+
+            // --- LOGIKA TOGGLE STATUS (Hadir vs Sakit) ---
             const selectStatus = popup.querySelector('#edit_status');
             const rowJam = popup.querySelector('#row_jam');
             const rowKet = popup.querySelector('#row_keterangan');
+
             function toggleForm() {
-                if (selectStatus.value === 'Hadir') { rowJam.style.display = 'flex'; rowKet.style.display = 'none'; } 
-                else { rowJam.style.display = 'none'; rowKet.style.display = 'block'; }
+                if (selectStatus.value === 'Hadir') { 
+                    rowJam.style.display = 'flex'; 
+                    rowKet.style.display = 'none'; 
+                } else { 
+                    rowJam.style.display = 'none'; 
+                    rowKet.style.display = 'block'; 
+                }
             }
+            
             toggleForm();
             selectStatus.addEventListener('change', toggleForm);
         },
-        preConfirm: () => { document.getElementById('formEditAbsen').submit(); }
+        preConfirm: () => { 
+            const form = Swal.getPopup().querySelector('form');
+            if(form) form.submit();
+        }
     });
 }
 
 function showIzinModal(actionUrl) {
     const template = document.getElementById('templateModalIzin');
     if(!template) return;
+    
     Swal.fire({
-        title: 'Form Ketidakhadiran', html: template.innerHTML, showCancelButton: true, confirmButtonText: 'Kirim',
-        didOpen: () => { Swal.getPopup().querySelector('#formIzin').action = actionUrl; },
-        preConfirm: () => { document.getElementById('formIzin').submit(); }
+        title: 'Form Izin / Sakit',
+        html: template.innerHTML,
+        showCancelButton: true,
+        confirmButtonText: 'Kirim Pengajuan',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#152e4d',
+        cancelButtonColor: '#f8c21a',
+        
+        didOpen: () => {
+            const popup = Swal.getPopup();
+            
+            // 1. Set Action URL
+            const form = popup.querySelector('form'); 
+            if(form) form.action = actionUrl;
+
+            // 2. Style Tombol Cancel
+            const cancelBtn = Swal.getCancelButton();
+            if (cancelBtn) {
+                cancelBtn.style.color = '#152e4d';
+                cancelBtn.style.fontWeight = 'bold';
+            }
+
+            // --- FITUR DRAG & DROP (BARU DITAMBAHKAN) ---
+            const dropZone = popup.querySelector('#drop_zone_izin');
+            const fileInput = popup.querySelector('#input_bukti_izin');
+            const labelArea = popup.querySelector('#label_file_izin');
+
+            // Fungsi Update UI saat ada file
+            const updateUI = (file) => {
+                labelArea.innerHTML = `
+                    <i class="ph ph-check-circle" style="font-size: 1.5rem; color: #152e4d; display: block; margin-bottom: 5px;"></i>
+                    <span style="color: #152e4d; font-weight: bold;">${file.name}</span>
+                `;
+                dropZone.style.borderColor = '#152e4d';
+                dropZone.style.backgroundColor = '#e0f2fe'; // Biru muda
+            };
+
+            // A. Event saat user KLIK manual
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    updateUI(this.files[0]);
+                }
+            });
+
+            // B. Event Drag Over (Saat file diseret di atas kotak)
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = '#152e4d';
+                dropZone.style.backgroundColor = '#e0f2fe';
+                if(!fileInput.files.length) {
+                    labelArea.querySelector('span').innerText = "Lepaskan file di sini...";
+                }
+            });
+
+            // C. Event Drag Leave (Saat file keluar dari kotak tanpa di-drop)
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                // Kembalikan style jika belum ada file yang dipilih
+                if (!fileInput.files.length) {
+                    dropZone.style.borderColor = '#cbd5e1';
+                    dropZone.style.backgroundColor = '#f8fafc';
+                    labelArea.querySelector('span').innerText = "Klik atau Seret File ke Sini";
+                }
+            });
+
+            // D. Event DROP (Saat file dilepaskan)
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files; // Masukkan file ke input
+                    updateUI(files[0]);      // Update tampilan
+                }
+            });
+        },
+
+        preConfirm: () => {
+            const form = Swal.getPopup().querySelector('form');
+            if (!form.checkValidity()) {
+                form.reportValidity(); 
+                return false; 
+            }
+            form.submit();
+        }
     });
 }
 
-// Helper Paginasi Universal
 function renderPaginationUniversal(container, totalPages, currentPage, callbackFunction) {
      if (!container) return;
+     
      currentPage = parseInt(currentPage);
      totalPages = parseInt(totalPages);
      
-     if (totalPages <= 1) { container.innerHTML = ''; return; }
+     // REVISI: Jangan sembunyikan pagination meski halamannya cuma 1.
+     // Biarkan tetap render agar layout tidak 'lompat'.
+     if (totalPages < 1) totalPages = 1; 
      
      let html = '<nav><ul class="pagination">';
+     
+     // 1. Tombol Previous
      const prevDisabled = currentPage === 1 ? 'disabled' : '';
      html += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a></li>`;
      
+     // 2. Tombol Angka
      let start = Math.max(1, currentPage - 2);
      let end = Math.min(totalPages, currentPage + 2);
+
+     // Logika tambahan agar angka tetap cantik jika total page sedikit
+     if (totalPages <= 5) {
+         start = 1;
+         end = totalPages;
+     }
+
      for (let i = start; i <= end; i++) {
          const active = i === currentPage ? 'active' : '';
          html += `<li class="page-item ${active}"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
      }
      
+     // 3. Tombol Next
      const nextDisabled = currentPage === totalPages ? 'disabled' : '';
      html += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" data-page="${currentPage + 1}">Next</a></li>`;
+     
      html += '</ul></nav>';
      
      container.innerHTML = html;
 
+     // Re-attach event listeners
      const links = container.querySelectorAll('.page-link');
      links.forEach(link => {
          link.addEventListener('click', (e) => {
              e.preventDefault();
+             // Mencegah klik jika disabled atau active
              const li = e.target.parentElement;
              if (!li.classList.contains('disabled') && !li.classList.contains('active')) {
                  callbackFunction(parseInt(e.target.dataset.page));
@@ -1581,4 +2251,211 @@ function renderPaginationUniversal(container, totalPages, currentPage, callbackF
          });
      });
 }
+//  FITUR UNLOCK USER (SWEETALERT)
+    document.body.addEventListener('click', function(e) {
+        // 1. Deteksi klik pada tombol unlock (atau ikon di dalamnya)
+        const unlockBtn = e.target.closest('.btn-unlock-user');
+
+        if (unlockBtn) {
+            e.preventDefault(); 
+            
+            const targetUrl = unlockBtn.getAttribute('data-url');
+            if (!targetUrl) return;
+
+            Swal.fire({
+                title: 'Buka Kunci Akun?', 
+                text: "Pengguna ini akan dapat login kembali.",
+                icon: 'question', 
+                
+                // --- REVISI: TEMA BIRU TUA (Sama dengan Hapus) ---
+                iconColor: '#152e4d',          // Ikon (?) jadi Biru Tua
+                confirmButtonColor: '#152e4d', // Tombol YA jadi Biru Tua
+                cancelButtonColor: '#f8c21a',  // Tombol Batal Tetap Kuning
+                
+                showCancelButton: true, 
+                confirmButtonText: 'Ya, Buka Kunci!', 
+                cancelButtonText: 'Batal',
+                
+                // Styling teks tombol Batal agar kontras
+                didOpen: () => {
+                    const cancelBtn = Swal.getCancelButton();
+                    if (cancelBtn) {
+                        cancelBtn.style.color = '#152e4d';
+                        cancelBtn.style.fontWeight = 'bold';
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Memproses...',
+                        timer: 1000,
+                        showConfirmButton: false,
+                        didOpen: () => { Swal.showLoading(); }
+                    }).then(() => {
+                        window.location.href = targetUrl;
+                    });
+                }
+            });
+        }
+        });
+    
+/* =========================================
+   27. LOGIKA REKAP ABSENSI (GLOBAL SCOPE)
+   ========================================= */
+
+function navShowPicker() {
+    const picker = document.getElementById('datePickerNative');
+    if (picker) {
+        // Coba gunakan API modern showPicker()
+        if (typeof picker.showPicker === 'function') {
+            try {
+                picker.showPicker();
+            } catch (err) {
+                // Fallback jika browser memblokir (jarang terjadi jika user action)
+                console.error(err);
+                picker.click(); 
+            }
+        } else {
+            // Fallback untuk browser lama
+            picker.focus();
+            picker.click();
+        }
+    } else {
+        console.error("Elemen datePickerNative tidak ditemukan!");
+    }
+}
+
+function navChangeDate(days) {
+    const currentInput = document.getElementById('datePickerNative');
+    if (!currentInput) return;
+    
+    const strDate = currentInput.value;
+    if (!strDate) return;
+
+    // Trik: Tambahkan waktu T12:00:00 agar tanggal tidak bergeser karena timezone
+    const currentDate = new Date(strDate + 'T12:00:00');
+    
+    // Tambah/Kurang hari
+    currentDate.setDate(currentDate.getDate() + days);
+    
+    // Format kembali ke YYYY-MM-DD
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    const newDateStr = `${year}-${month}-${day}`;
+    
+    navGoToDate(newDateStr);
+}
+
+function navGoToDate(dateStr) {
+    // PERBAIKAN UTAMA: Gunakan selector atribut [data-base-url] 
+    // agar tidak salah mengambil div pembungkus layout
+    const mainElem = document.querySelector('[data-base-url]');
+    
+    let baseUrl = "";
+    if (mainElem) {
+        baseUrl = mainElem.dataset.baseUrl;
+    } else {
+        // Fallback darurat jika elemen tidak ketemu
+        console.error("Base URL element not found!");
+        return; 
+    }
+    
+    // Redirect ke tanggal yang dipilih
+    window.location.href = baseUrl + "admin/rekapAbsensi?mode=harian&date=" + dateStr;
+}
+
+function applyReportFilter() {
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+    const user = document.getElementById('filterUser').value;
+    
+    const mainElem = document.querySelector('[data-base-url]'); // Perbaikan selector juga di sini
+    const baseUrl = mainElem ? mainElem.dataset.baseUrl : ""; 
+    
+    window.location.href = baseUrl + "admin/rekapAbsensi?mode=laporan&start_date=" + start + "&end_date=" + end + "&user_id=" + user;
+} 
+/* =========================================
+   28. LOGIKA LAPORAN ABSENSI (PRESET & EXPORT)
+   ========================================= */
+
+function setPeriod(type) {
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    
+    if (!startDateInput || !endDateInput) return;
+
+    const today = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    if (type === 'today') {
+        // Hari Ini (Start & End = Today)
+    } 
+    else if (type === 'this_week') {
+        const day = today.getDay(); 
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1); 
+        start.setDate(diff);
+        end.setDate(diff + 6);
+    } 
+    else if (type === 'this_month') {
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } 
+    else if (type === 'last_month') {
+        start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        end = new Date(today.getFullYear(), today.getMonth(), 0);
+    }
+
+    const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    startDateInput.value = formatDate(start);
+    endDateInput.value = formatDate(end);
+
+    // [PERBAIKAN] Panggil fungsi global
+    if (typeof window.loadAbsensiGlobal === 'function') {
+        window.loadAbsensiGlobal(1);
+    } else {
+        // Fallback jika error
+        const form = document.getElementById('formLaporan');
+        if (form) form.submit();
+    }
+}
+
+function exportLaporan() {
+    const form = document.getElementById('formLaporan');
+    if(!form) return;
+
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+    
+    const mainElem = document.querySelector('[data-base-url]');
+    const baseUrl = mainElem ? mainElem.dataset.baseUrl : '';
+
+    window.location.href = baseUrl + 'admin/exportAbsensi?' + params.toString();
+}  
+/* =========================================
+   FUNGSI POPUP KETERANGAN ABSENSI
+   ========================================= */
+window.showDetailKeterangan = function(text) {
+    // Decode HTML entities jika ada (agar karakter seperti &quot; kembali jadi tanda kutip)
+    const txt = new DOMParser().parseFromString(text, "text/html").documentElement.textContent;
+    
+    Swal.fire({
+        title: 'Keterangan Lengkap',
+        text: txt,
+        icon: 'info',
+        confirmButtonText: 'Tutup',
+        confirmButtonColor: '#152e4d',
+        customClass: {
+            popup: 'swal-wide' // Opsional: jika ingin popup agak lebar
+        }
+    });
+};
+
 

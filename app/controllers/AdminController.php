@@ -207,67 +207,82 @@ public function dashboard() {
     }
 
     /**
-     * Menampilkan halaman form tambah pengguna
+     * Menambahkan user baru dengan Tanggal Lahir (Password Default)
      */
-    public function addUser() {
-        $data = [
-            'judul' => 'Tambah Pengguna'
-        ];
-        $this->view('admin/form_user', $data);
-    }
+    /**
+ * Menampilkan halaman form tambah pengguna
+ */
+public function addUser() { // <--- Hapus parameter $data
+    $data = [
+        'judul' => 'Tambah Pengguna Baru',
+        // Kita kirim array kosong atau null untuk variabel 'user' 
+        // agar view form_user.php tidak error saat mengecek variabel $data['user'] (jika dipakai bersamaan dengan edit)
+        'user' => null 
+    ];
+    
+    // Memanggil View Formulir
+    $this->view('admin/form_user', $data);
+}
 
     /**
-     * Memproses data dari form tambah pengguna
+     * Memproses data dari form tambah pengguna (FIX: Handle Duplicate Email)
      */
     public function processAddUser() {
-        // Pastikan ini adalah request POST
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $tgl_lahir = $_POST['tanggal_lahir']; 
             
-            // 1. Kumpulkan data dari form
-            $data = [
-                'nama_lengkap' => $_POST['nama_lengkap'],
-                'email' => $_POST['email'],
-                'password' => $_POST['password'],
-                'role' => $_POST['role']
-            ];
-
-            $userModel = $this->model('User_model');
-
-            try {
-                // 2. Coba simpan ke database
-                if ($userModel->createUser($data)) {
-                    $_SESSION['flash_message'] = [
-                        'text' => 'Data pengguna baru berhasil ditambahkan.',
-                        'type' => 'success'
-                    ];
-                }
-            } catch (PDOException $e) {
-                // 3. TANGKAP ERROR JIKA GAGAL
-                
-                // Cek Kode Error 1062 (Duplicate Entry / Email Kembar)
-                if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
-                    $_SESSION['flash_message'] = [
-                        'text' => 'Gagal! Email "' . htmlspecialchars($_POST['email']) . '" sudah terdaftar.',
-                        'type' => 'error'
-                    ];
-                } else {
-                    // Error database lainnya
-                    $_SESSION['flash_message'] = [
-                        'text' => 'Gagal menambahkan pengguna: ' . $e->getMessage(),
-                        'type' => 'error'
-                    ];
+            // Default Password
+            $passwordDefault = '123456';
+            if (!empty($tgl_lahir)) {
+                $dateObj = DateTime::createFromFormat('Y-m-d', $tgl_lahir);
+                if ($dateObj) {
+                    $passwordDefault = $dateObj->format('dmY'); 
                 }
             }
 
-            // 4. Kembali ke halaman daftar user
-            header('Location: ' . BASE_URL . 'admin/users');
-            exit;
+            $data = [
+                'nama_lengkap' => $_POST['nama_lengkap'],
+                'tanggal_lahir' => $tgl_lahir, 
+                'email' => $_POST['email'],
+                'password' => $passwordDefault, 
+                'role' => $_POST['role']
+            ];
 
-        } else {
-            header('Location: ' . BASE_URL . 'admin/users');
+            // TAMBAHKAN TRY-CATCH DI SINI
+            try {
+                if ($this->model('User_model')->addUser($data)) {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Berhasil menambahkan pengguna. Password awal: ' . $passwordDefault,
+                        'type' => 'success'
+                    ];
+                    header('Location: ' . BASE_URL . 'admin/users');
+                } else {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Gagal menambahkan pengguna (Error tidak diketahui).',
+                        'type' => 'error'
+                    ];
+                    header('Location: ' . BASE_URL . 'admin/addUser');
+                }
+            } catch (PDOException $e) {
+                // Tangkap Error Duplicate Entry (Kode 1062)
+                if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Gagal! Email "' . $data['email'] . '" sudah digunakan oleh pengguna lain.',
+                        'type' => 'error'
+                    ];
+                } else {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Terjadi kesalahan database: ' . $e->getMessage(),
+                        'type' => 'error'
+                    ];
+                }
+                // Kembalikan ke form input agar bisa diperbaiki
+                header('Location: ' . BASE_URL . 'admin/addUser'); 
+            }
             exit;
         }
     }
+    
     /**
      * Menampilkan halaman form edit pengguna (berdasarkan ID)
      * @param int $id ID user dari URL
@@ -289,49 +304,49 @@ public function dashboard() {
     }
 
     /**
-     * Memproses data dari form edit pengguna
+     * Memproses data dari form edit pengguna (FIX: Handle Duplicate Email)
      */
     public function processUpdateUser() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            
             $data = [
                 'user_id' => $_POST['user_id'],
                 'nama_lengkap' => $_POST['nama_lengkap'],
+                'tanggal_lahir' => $_POST['tanggal_lahir'],
                 'email' => $_POST['email'],
                 'password' => $_POST['password'],
                 'role' => $_POST['role']
             ];
 
-            $userModel = $this->model('User_model');
-
+            // TAMBAHKAN TRY-CATCH DI SINI JUGA
             try {
-                // Coba Update
-                if ($userModel->updateUser($data)) {
+                if ($this->model('User_model')->updateUser($data)) {
                     $_SESSION['flash_message'] = [
-                        'text' => 'Data pengguna berhasil di-update.',
+                        'text' => 'Data pengguna berhasil diperbarui.',
                         'type' => 'success'
                     ];
+                    header('Location: ' . BASE_URL . 'admin/users');
+                } else {
+                    $_SESSION['flash_message'] = [
+                        'text' => 'Gagal memperbarui data pengguna.',
+                        'type' => 'error'
+                    ];
+                    header('Location: ' . BASE_URL . 'admin/editUser/' . $data['user_id']);
                 }
             } catch (PDOException $e) {
-                // Tangkap Error Duplikat saat Edit
+                // Tangkap Error Duplicate Email saat Edit
                 if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
                     $_SESSION['flash_message'] = [
-                        'text' => 'Gagal Update! Email "' . htmlspecialchars($_POST['email']) . '" sudah dipakai user lain.',
+                        'text' => 'Gagal Update! Email "' . $data['email'] . '" sudah digunakan oleh user lain.',
                         'type' => 'error'
                     ];
                 } else {
                     $_SESSION['flash_message'] = [
-                        'text' => 'Gagal mengupdate user: ' . $e->getMessage(),
+                        'text' => 'Terjadi kesalahan database: ' . $e->getMessage(),
                         'type' => 'error'
                     ];
                 }
+                header('Location: ' . BASE_URL . 'admin/editUser/' . $data['user_id']);
             }
-
-            header('Location: ' . BASE_URL . 'admin/users');
-            exit;
-
-        } else {
-            header('Location: ' . BASE_URL . 'admin/users');
             exit;
         }
     }
@@ -375,11 +390,12 @@ public function dashboard() {
     }
 
     /**
-     * Memproses file CSV yang di-upload untuk import pengguna
-     * Format CSV Wajib: Nama Lengkap, Email, Password, Role
+     * Memproses file CSV untuk import pengguna
+     * Format CSV Wajib: 
+     * [0] Nama Lengkap, [1] Email, [2] Tanggal Lahir (YYYY-MM-DD), [3] Role
      */
     public function importUsers() {
-        // 1. Validasi request
+        // 1. Validasi request & File
         if ($_SERVER['REQUEST_METHOD'] != 'POST' || !isset($_FILES['csv_file'])) {
             header('Location: ' . BASE_URL . 'admin/users');
             exit;
@@ -402,18 +418,39 @@ public function dashboard() {
                 if (count($data) >= 4) {
                     $nama = trim($data[0]);
                     $email = trim($data[1]);
-                    $pass = trim($data[2]);
+                    $tgl_lahir_raw = trim($data[2]); // Kolom 3: Tanggal Lahir
                     $role = strtolower(trim($data[3]));
 
                     // Filter baris header (jika ada kata 'email' di kolom email)
                     if (strtolower($email) == 'email') continue;
 
-                    if (!empty($nama) && !empty($email) && !empty($pass) && !empty($role)) {
+                    if (!empty($nama) && !empty($email) && !empty($role)) {
+                        
+                        // --- LOGIKA PASSWORD DARI TANGGAL LAHIR ---
+                        $password = '123456'; // Default password jika tanggal kosong/error
+                        $tgl_lahir_db = null; // Default null untuk DB
+
+                        if (!empty($tgl_lahir_raw)) {
+                            // Parsing tanggal (support format Y-m-d, d-m-Y, d/m/Y dari Excel)
+                            $timestamp = strtotime($tgl_lahir_raw);
+                            
+                            if ($timestamp) {
+                                // 1. Set Password jadi format DDMMYYYY (Tanpa strip/garis miring)
+                                // Contoh: 25 Desember 1990 -> 25121990
+                                $password = date('dmY', $timestamp);
+                                
+                                // 2. Set Format Database (YYYY-MM-DD)
+                                $tgl_lahir_db = date('Y-m-d', $timestamp);
+                            }
+                        }
+                        // ------------------------------------------
+
                         $usersToImport[] = [
-                            'nama_lengkap' => $nama,
-                            'email'        => $email,
-                            'password'     => $pass,
-                            'role'         => $role
+                            'nama_lengkap'  => $nama,
+                            'email'         => $email,
+                            'tanggal_lahir' => $tgl_lahir_db, // Simpan tanggal
+                            'password'      => $password,     // Simpan password hasil generate
+                            'role'          => $role
                         ];
                     }
                 }
@@ -425,7 +462,7 @@ public function dashboard() {
         if (!empty($usersToImport)) {
             $userModel = $this->model('User_model');
             
-            // Panggil model yang baru (Smart Import)
+            // Panggil model import
             $result = $userModel->importUsers($usersToImport);
 
             // Buat Pesan Laporan
@@ -440,10 +477,6 @@ public function dashboard() {
             // Rincian Skipped (Duplikat)
             if ($result['skipped'] > 0) {
                 $msgText .= "⚠️ <b>{$result['skipped']}</b> data dilewati karena email sudah ada.<br>";
-                // Opsional: Tampilkan list email yg skip (bisa dihapus jika terlalu panjang)
-                // $msgText .= "<small>(" . implode(', ', $result['skipped_list']) . ")</small>";
-                
-                // Jika tidak ada yang sukses sama sekali, ubah warna jadi warning
                 if ($result['success'] == 0) $msgType = 'warning';
             }
 
@@ -2040,25 +2073,58 @@ exit;
      * Menampilkan Halaman Rekap Absensi (Admin View)
      * UPDATE: Support AJAX Real-time Filter (Search & Status)
      */
+    /**
+     * Menampilkan Halaman Rekap Absensi (Admin View)
+     * UPDATE: Support Date Navigation & Report Mode
+     */
     public function rekapAbsensi($page = 1) {
+        // 1. Tentukan Mode (Harian atau Laporan)
+        $mode = $_GET['mode'] ?? 'harian'; 
+        
+        // 2. Siapkan Filter Dasar
         $filters = [
-            'search'  => $_GET['search'] ?? '',
-            'status'  => $_GET['status'] ?? '', 
-            'month'   => $_GET['month'] ?? date('m'), 
-            'year'    => $_GET['year'] ?? date('Y')
+            'search' => $_GET['search'] ?? '',
+            'status' => $_GET['status'] ?? '',
+            'user_id' => $_GET['user_id'] ?? '',
+            'role'    => $_GET['role'] ?? ''
         ];
+
+        // 3. Logika Filter Waktu Berdasarkan Mode
+        if ($mode == 'harian') {
+            // Ambil tanggal dari URL, kalau tidak ada pakai Hari Ini (Y-m-d)
+            $filters['specific_date'] = $_GET['date'] ?? date('Y-m-d');
+            
+            // Kosongkan range agar model fokus ke satu tanggal
+            $filters['start_date'] = '';
+            $filters['end_date'] = '';
+        } else {
+            // Mode Laporan (Range Tanggal)
+            $filters['specific_date'] = ''; 
+            // Default: 1 bulan ini
+            $filters['start_date'] = $_GET['start_date'] ?? date('Y-m-01');
+            $filters['end_date']   = $_GET['end_date'] ?? date('Y-m-t');
+        }
+
+        // 4. Setup Paginasi
         $limit = 10;
         $page = (int)$page;
         if ($page < 1) $page = 1;
+
         $absensiModel = $this->model('Absensi_model');
+        
+        // 5. Hitung Total & Ambil Data
         $totalAbsensi = $absensiModel->getTotalAbsensiCount($filters);
         $totalPages = ceil($totalAbsensi / $limit);
         $offset = ($page - 1) * $limit;
         $paginatedAbsensi = $absensiModel->getAbsensiPaginated($limit, $offset, $filters);
+
+        // 6. Handle Request AJAX (Jika Search Bar diketik)
         if (isset($_GET['ajax'])) {
             $formattedData = [];
             foreach ($paginatedAbsensi as $absen) {
-                $totalJam = '-';
+                // (Logika format data JSON sama seperti sebelumnya)
+                // ... (kode format JSON disingkat agar tidak panjang, pakai yang lama) ...
+                 $totalJam = '-';
                 $status = 'Alpa';               
                 if ($absen['status'] != 'Hadir') {
                     $status = $absen['status'];
@@ -2078,13 +2144,15 @@ exit;
 
                 $formattedData[] = [
                     'absen_id'      => $absen['absen_id'],
-                    'tanggal'       => date('d-m-Y', strtotime($absen['tanggal'])),
+                    'tanggal'       => date('d/m/Y', strtotime($absen['tanggal'])),
                     'nama_lengkap'  => htmlspecialchars($absen['nama_lengkap']),
-                    'waktu_masuk'   => $absen['waktu_masuk'] ? date('H:i:s', strtotime($absen['waktu_masuk'])) : '-',
-                    'waktu_pulang'  => $absen['waktu_pulang'] ? date('H:i:s', strtotime($absen['waktu_pulang'])) : '-',
+                    'role'          => ucfirst($absen['role']),
+                    'waktu_masuk'   => $absen['waktu_masuk'] ? date('H:i', strtotime($absen['waktu_masuk'])) : '-',
+                    'waktu_pulang'  => $absen['waktu_pulang'] ? date('H:i', strtotime($absen['waktu_pulang'])) : '-',
                     'total_jam'     => $totalJam,
                     'status'        => $status,
-                    'bukti_foto'    => $absen['bukti_foto'] 
+                    'bukti_foto'    => $absen['bukti_foto'],
+                    'keterangan'    => $absen['keterangan']
                 ];
             }
             header('Content-Type: application/json');
@@ -2095,12 +2163,18 @@ exit;
             ]);
             exit;
         }
+
+        // 7. Kirim Data ke View
+        $userModel = $this->model('User_model');
+        
         $data = [
             'judul' => 'Rekap Absensi',
             'absensi' => $paginatedAbsensi,
             'totalPages' => $totalPages,
             'currentPage' => $page,
-            'filters' => $filters
+            'filters' => $filters, // PENTING: Ini membawa 'specific_date' ke View
+            'mode' => $mode,
+            'allUsers' => $userModel->getAllUsers()
         ];      
         $this->view('admin/rekap_absensi', $data);
     }
@@ -2436,63 +2510,42 @@ public function processCheckOut() {
     public function updateAbsensiManual() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
-            $status = $_POST['status'];
             $id = $_POST['absen_id'];
+            $status = $_POST['status'];
             
-            // Data Dasar untuk Model
             $data = [
                 'absen_id' => $id,
                 'status'   => $status
             ];
             
-            // Logika Data Berdasarkan Status
             if ($status == 'Hadir') {
-                // JIKA HADIR:
-                $data['waktu_masuk'] = !empty($_POST['waktu_masuk']) ? $_POST['waktu_masuk'] : null;
-                $data['waktu_pulang'] = !empty($_POST['waktu_pulang']) ? $_POST['waktu_pulang'] : null;
-                $data['keterangan'] = null; // Hapus keterangan
+                // Pastikan jam dikirim dengan format lengkap
+                $data['waktu_masuk']  = !empty($_POST['waktu_masuk']) ? $_POST['waktu_masuk'] . ':00' : null;
+                $data['waktu_pulang'] = !empty($_POST['waktu_pulang']) ? $_POST['waktu_pulang'] . ':00' : null;
                 
-                // 🔥 HAPUS BUKTI FOTO (Set NULL) 🔥
-                // Kita kirim kunci 'bukti_foto' dengan nilai null agar Model menghapusnya
+                // Keterangan & Foto di-null-kan jika hadir
+                $data['keterangan'] = null; 
                 $data['bukti_foto'] = null; 
-
             } else {
-                // JIKA SAKIT/IZIN/ALPA:
-                $data['waktu_masuk'] = null; 
+                $data['waktu_masuk']  = null; 
                 $data['waktu_pulang'] = null;
-                $data['keterangan'] = $_POST['keterangan'];
+                $data['keterangan']   = $_POST['keterangan'];
 
-                // Cek Upload File Baru
+                // Handle Upload
                 if (isset($_FILES['bukti_foto']) && $_FILES['bukti_foto']['error'] == UPLOAD_ERR_OK) {
                     $file = $_FILES['bukti_foto'];
-                    $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                    $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
-
-                    if (in_array($fileExt, $allowed)) {
-                        if ($file['size'] <= 2000000) { 
-                            $buktiNama = "admin_upd_" . $id . "_" . time() . "." . $fileExt;
-                            $destination = APPROOT . '/../public/uploads/bukti_absen/' . $buktiNama;
-                            
-                            if (move_uploaded_file($file['tmp_name'], $destination)) {
-                                // Jika upload sukses, masukkan ke data update
-                                $data['bukti_foto'] = $buktiNama;
-                            }
-                        } 
+                    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                    $newName = "admin_upd_" . $id . "_" . time() . "." . $ext;
+                    
+                    if (move_uploaded_file($file['tmp_name'], APPROOT . '/../public/uploads/bukti_absen/' . $newName)) {
+                        $data['bukti_foto'] = $newName;
                     }
                 }
-                // CATATAN: Jika tidak ada file baru diupload saat status Sakit/Izin,
-                // kita JANGAN kirim key 'bukti_foto' ke array $data.
-                // Agar bukti lama (jika ada) tidak terhapus/tertimpa null.
             }
 
-            $absensiModel = $this->model('Absensi_model');
+            $this->model('Absensi_model')->updateAbsensi($data);
             
-            if ($absensiModel->updateAbsensi($data)) {
-                $_SESSION['flash_message'] = ['text' => 'Data absensi berhasil diperbarui.', 'type' => 'success'];
-            } else {
-                $_SESSION['flash_message'] = ['text' => 'Gagal memperbarui data.', 'type' => 'error'];
-            }
-            
+            $_SESSION['flash_message'] = ['text' => 'Data absensi berhasil diperbarui.', 'type' => 'success'];
             header('Location: ' . BASE_URL . 'admin/rekapAbsensi');
             exit;
         }
@@ -2838,5 +2891,56 @@ public function processCheckOut() {
             exit;
         }
     }
+
+    
+    /**
+     * [AKSI] Export Laporan Absensi (CSV/Excel)
+     * URL: /admin/exportAbsensi?mode=laporan&start_date=...&role=...&search=...
+     */
+    public function exportAbsensi() {
+        // 1. Tangkap Filter dari URL
+        $filters = [
+            'search'     => $_GET['search'] ?? '',
+            'role'       => $_GET['role'] ?? '',
+            'user_id'    => $_GET['user_id'] ?? '',
+            'start_date' => $_GET['start_date'] ?? date('Y-m-01'),
+            'end_date'   => $_GET['end_date'] ?? date('Y-m-t')
+        ];
+
+        // 2. Ambil Data
+        $absensiModel = $this->model('Absensi_model');
+        $data = $absensiModel->getAllAbsensiForExport($filters);
+        
+        // 3. Setup CSV
+        $filename = "Laporan_Absensi_" . date('Ymd_His') . ".csv";
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        
+        $output = fopen('php://output', 'w');
+        
+        // Header CSV
+        fputcsv($output, ['Tanggal', 'Nama Karyawan', 'Role', 'Jam Masuk', 'Jam Pulang', 'Status', 'Keterangan']);
+
+        // Isi Data
+        foreach ($data as $row) {
+            // Format Jam
+            $masuk = $row['waktu_masuk'] ? date('H:i', strtotime($row['waktu_masuk'])) : '-';
+            $pulang = $row['waktu_pulang'] ? date('H:i', strtotime($row['waktu_pulang'])) : '-';
+            
+            fputcsv($output, [
+                $row['tanggal'],
+                $row['nama_lengkap'],
+                ucfirst($row['role']),
+                $masuk,
+                $pulang,
+                $row['status'],
+                $row['keterangan']
+            ]);
+        }
+        
+        fclose($output);
+        exit;
+    }
+
 
 }

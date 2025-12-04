@@ -143,12 +143,15 @@ class ProfileController extends Controller {
     /**
      * Menampilkan Riwayat Absensi User (Support AJAX Realtime)
      */
+    /**
+     * Menampilkan Riwayat Absensi User (Support AJAX & Date Range)
+     */
     public function absensi($page = 1) {
-        // 1. Setup Filter
+        // 1. Setup Filter (Default: Tanggal 1 s/d Hari ini di bulan berjalan)
         $filters = [
-            'user_id' => $_SESSION['user_id'], 
-            'month'   => $_GET['month'] ?? date('m'),
-            'year'    => $_GET['year'] ?? date('Y')
+            'user_id'    => $_SESSION['user_id'], 
+            'start_date' => $_GET['start_date'] ?? date('Y-m-01'),
+            'end_date'   => $_GET['end_date'] ?? date('Y-m-t')
         ];
 
         // 2. Setup Paginasi
@@ -159,39 +162,42 @@ class ProfileController extends Controller {
         // 3. Panggil Model
         $absensiModel = $this->model('Absensi_model');
         
+        // Gunakan method yang sama dengan Admin (karena modelnya sudah support filter start_date/end_date)
         $totalData = $absensiModel->getTotalAbsensiCount($filters);
         $totalPages = ceil($totalData / $limit);
         $offset = ($page - 1) * $limit;
         $history = $absensiModel->getAbsensiPaginated($limit, $offset, $filters);
 
-        // --- 4. LOGIKA AJAX (BARU) ---
+        // --- 4. LOGIKA AJAX ---
         if (isset($_GET['ajax'])) {
             $formattedData = [];
             foreach ($history as $absen) {
+                // (Logika mapping data JSON sama seperti sebelumnya)
                 $totalJam = '-';
                 $displayStatus = $absen['status'];
                 
-                // Kalkulasi Jam Kerja
                 if ($absen['status'] == 'Hadir') {
                     if ($absen['waktu_masuk']) {
                         if ($absen['waktu_pulang']) {
-                            $checkin = new DateTime($absen['waktu_masuk']);
-                            $checkout = new DateTime($absen['waktu_pulang']);
-                            $interval = $checkin->diff($checkout);
-                            $totalJam = $interval->format('%h jam %i mnt');
+                            $t1 = new DateTime($absen['waktu_masuk']);
+                            $t2 = new DateTime($absen['waktu_pulang']);
+                            $totalJam = $t1->diff($t2)->format('%h jam %i mnt');
                         } else {
-                            $displayStatus = 'Masih Bekerja';
+                            // Logika "Masih Bekerja" (Hanya jika hari ini)
+                            if ($absen['tanggal'] == date('Y-m-d')) {
+                                $displayStatus = 'Masih Bekerja';
+                            }
                         }
                     }
                 }
 
                 $formattedData[] = [
-                    'tanggal'       => date('d-m-Y', strtotime($absen['tanggal'])),
+                    'tanggal'       => date('d/m/Y', strtotime($absen['tanggal'])), // Format d/m/Y
                     'waktu_masuk'   => $absen['waktu_masuk'] ? date('H:i', strtotime($absen['waktu_masuk'])) : '-',
                     'waktu_pulang'  => $absen['waktu_pulang'] ? date('H:i', strtotime($absen['waktu_pulang'])) : '-',
                     'total_jam'     => $totalJam,
-                    'status_raw'    => $absen['status'], // Status asli untuk logic warna di JS
-                    'display_status'=> $displayStatus,   // Status teks untuk ditampilkan
+                    'status_raw'    => $absen['status'],
+                    'display_status'=> $displayStatus,
                     'keterangan'    => $absen['keterangan'] ?? '-',
                     'bukti_foto'    => $absen['bukti_foto']
                 ];
@@ -203,17 +209,22 @@ class ProfileController extends Controller {
                 'totalPages' => $totalPages,
                 'currentPage' => $page
             ]);
-            exit; // Stop di sini jika AJAX
+            exit; 
         }
-        // -----------------------------
 
-        // 5. Siapkan Data (Jika bukan AJAX)
+        // 5. Siapkan Data View
         $data = [
             'judul' => 'Riwayat Absensi Saya',
             'absensi' => $history,
             'totalPages' => $totalPages,
             'currentPage' => $page,
-            'filters' => $filters
+            'filters' => $filters,
+            
+            // [BARU] Tambahkan konfigurasi tombol kembali
+            'back_button' => [
+                'url' => BASE_URL . 'profile/index',
+                'label' => 'Kembali ke Profil'
+            ]
         ];
         
         $this->view('profile/history_absensi', $data);

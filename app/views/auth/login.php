@@ -30,18 +30,9 @@
                     </div>
 
                     <div class="info-item">
-                        <span class="icon">🔒</span>
-                        <div class="text">
-                            <strong>Keamanan Akun</strong>
-                            <p>Sistem akan mengunci akun otomatis jika salah password <strong>5 kali</strong> berturut-turut.</p>
-                        </div>
-                    </div>
-
-                    <div class="info-item">
-                        <span class="icon">📞</span>
-                        <div class="text">
+                        <span class="icon">📞</span> <div class="text">
                             <strong>Hubungi Admin</strong>
-                            <p>Jika akun terkunci atau lupa password, segera hubungi Administrator Gudang.</p>
+                            <p>Jika gagal login, segera hubungi Administrator Gudang.</p>
                         </div>
                     </div>
                 </div>

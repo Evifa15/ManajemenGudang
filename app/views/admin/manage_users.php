@@ -5,14 +5,14 @@
 
 <main class="app-content">
     <?php
-        // Blok Notifikasi
+        // Blok Notifikasi Flash Message
         if(isset($_SESSION['flash_message'])) {
             $flash = $_SESSION['flash_message'];
             echo '<div class="flash-message ' . $flash['type'] . '">' . $flash['text'] . '</div>';
             unset($_SESSION['flash_message']);
         }
     ?>
-    
+
     <div class="toolbar-floating">
         
         <div class="search-box-wrapper">
@@ -46,7 +46,7 @@
             </button>
             
             <a href="<?php echo BASE_URL; ?>admin/addUser" class="btn btn-brand-dark btn-sm" style="padding: 8px 20px;">
-                <i class="ph ph-plus"></i> User Baru
+                <i class="ph ph-plus"></i> Tambah Pengguna
             </a>
         </div>
     </div>
@@ -67,7 +67,7 @@
                 </thead>
                 <tbody id="userTableBody">
                     <?php if (empty($data['users'])): ?>
-                        <tr><td colspan="5" style="text-align:center; padding: 20px;">Data pengguna tidak ditemukan.</td></tr>
+                        <tr><td colspan="5" style="text-align:center; padding: 20px; color: #666;">Data tidak ditemukan.</td></tr>
                     <?php else: ?>
                         <?php foreach ($data['users'] as $user) : ?>
                         <tr>
@@ -76,8 +76,14 @@
                                     <input type="checkbox" class="user-checkbox" value="<?php echo $user['user_id']; ?>" style="transform: scale(1.2); cursor: pointer;">
                                 <?php endif; ?>
                             </td>
-                            <td><strong><?php echo htmlspecialchars($user['nama_lengkap']); ?></strong></td>
+                            
+                            <td>
+                                <strong><?php echo htmlspecialchars($user['nama_lengkap']); ?></strong>
+                                
+                            </td>
+                            
                             <td style="color: #666;"><?php echo htmlspecialchars($user['email']); ?></td>
+                            
                             <td>
                                 <?php 
                                     $roleClass = '';
@@ -90,8 +96,12 @@
                                     <?php echo htmlspecialchars($user['role']); ?>
                                 </span>
                             </td>
+                            
                             <td>
                                 <div class="action-buttons">
+                                    
+                                    
+
                                     <a href="<?php echo BASE_URL; ?>admin/editUser/<?php echo $user['user_id']; ?>" class="btn-icon edit" title="Edit">
                                         <i class="ph ph-pencil-simple"></i>
                                     </a>
@@ -114,12 +124,14 @@
         </div>
     </div>
 
-    <div class="pagination-container custom-pagination">
+    <div class="pagination-container custom-pagination" id="paginationContainerUsers">
         <nav>
             <ul class="pagination">
                 <?php
                     $currentPage = $data['currentPage'];
                     $totalPages = $data['totalPages'];
+                    
+                    // Pertahankan parameter search/filter saat pindah halaman
                     $queryParams = [];
                     if (!empty($data['search'])) $queryParams['search'] = $data['search'];
                     if (!empty($data['role'])) $queryParams['role'] = $data['role'];

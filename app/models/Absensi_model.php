@@ -9,20 +9,25 @@ class Absensi_model extends Model {
     }
 
     /**
-     * Menghitung total data absensi (dengan filter Status & Search)
+     * Menghitung total data absensi (Support Filter Tanggal Spesifik & Range)
      */
     public function getTotalAbsensiCount($filters = []) {
         $sql = "SELECT COUNT(a.absen_id) as total 
                 FROM " . $this->table . " a
                 LEFT JOIN users u ON a.user_id = u.user_id
                 WHERE 1=1";
+        
         $params = [];
+
+        // Filter Pencarian Nama/Email
         if (!empty($filters['search'])) {
             $sql .= " AND (u.nama_lengkap LIKE :search OR u.email LIKE :search)";
             $params[':search'] = '%' . $filters['search'] . '%';
         }
+
+        // Filter Status
         if (!empty($filters['status'])) {
-            if ($filters['status'] == 'Masih Bekerja') {
+             if ($filters['status'] == 'Masih Bekerja') {
                 $sql .= " AND a.status = 'Hadir' AND a.waktu_pulang IS NULL";
             } elseif ($filters['status'] == 'Hadir') {
                 $sql .= " AND a.status = 'Hadir' AND a.waktu_pulang IS NOT NULL";
@@ -31,14 +36,36 @@ class Absensi_model extends Model {
                 $params[':status'] = $filters['status'];
             }
         }
-        if (!empty($filters['month'])) {
-            $sql .= " AND MONTH(a.tanggal) = :month";
-            $params[':month'] = $filters['month'];
+
+        // Filter User Spesifik (Untuk Laporan Perorangan)
+        if (!empty($filters['user_id'])) {
+            $sql .= " AND a.user_id = :uid";
+            $params[':uid'] = $filters['user_id'];
         }
-        if (!empty($filters['year'])) {
-            $sql .= " AND YEAR(a.tanggal) = :year";
-            $params[':year'] = $filters['year'];
+        if (!empty($filters['role'])) {
+            $sql .= " AND u.role = :role";
+            $params[':role'] = $filters['role'];
         }
+
+        // --- LOGIKA TANGGAL BARU ---
+        
+        // 1. Mode Harian (Satu Tanggal Spesifik)
+        if (!empty($filters['specific_date'])) {
+            $sql .= " AND a.tanggal = :spec_date";
+            $params[':spec_date'] = $filters['specific_date'];
+        }
+        // 2. Mode Laporan (Rentang Tanggal)
+        else {
+            if (!empty($filters['start_date'])) {
+                $sql .= " AND a.tanggal >= :start";
+                $params[':start'] = $filters['start_date'];
+            }
+            if (!empty($filters['end_date'])) {
+                $sql .= " AND a.tanggal <= :end";
+                $params[':end'] = $filters['end_date'];
+            }
+        }
+
         $this->query($sql);
         foreach ($params as $key => $value) {
             $this->bind($key, $value);
@@ -46,19 +73,22 @@ class Absensi_model extends Model {
         return $this->single()['total'];
     }
 
-    /* --- MENGAMBIL DATA DENGAN PAGINASI (SEARCH DAN FILTER STATUS) --- */
     public function getAbsensiPaginated($limit, $offset, $filters = []) {
-        $sql = "SELECT a.absen_id, a.tanggal, a.waktu_masuk, a.waktu_pulang, a.status, a.bukti_foto, u.nama_lengkap
-            FROM " . $this->table . " a
-            LEFT JOIN users u ON a.user_id = u.user_id
-            WHERE 1=1";       
-        $params = [];       
+        $sql = "SELECT a.absen_id, a.tanggal, a.waktu_masuk, a.waktu_pulang, a.status, a.keterangan, a.bukti_foto, 
+                       u.nama_lengkap, u.role 
+                FROM " . $this->table . " a
+                LEFT JOIN users u ON a.user_id = u.user_id
+                WHERE 1=1";
+        
+        $params = [];
+        
+        // ... (Copy logic filter Search, Status, User_ID dari fungsi count di atas) ...
         if (!empty($filters['search'])) {
             $sql .= " AND (u.nama_lengkap LIKE :search OR u.email LIKE :search)";
             $params[':search'] = '%' . $filters['search'] . '%';
         }
         if (!empty($filters['status'])) {
-            if ($filters['status'] == 'Masih Bekerja') {
+             if ($filters['status'] == 'Masih Bekerja') {
                 $sql .= " AND a.status = 'Hadir' AND a.waktu_pulang IS NULL";
             } elseif ($filters['status'] == 'Hadir') {
                 $sql .= " AND a.status = 'Hadir' AND a.waktu_pulang IS NOT NULL";
@@ -67,23 +97,37 @@ class Absensi_model extends Model {
                 $params[':status'] = $filters['status'];
             }
         }
-        if (!empty($filters['month'])) {
-            $sql .= " AND MONTH(a.tanggal) = :month";
-            $params[':month'] = $filters['month'];
+        if (!empty($filters['user_id'])) {
+            $sql .= " AND a.user_id = :uid";
+            $params[':uid'] = $filters['user_id'];
         }
-        if (!empty($filters['year'])) {
-            $sql .= " AND YEAR(a.tanggal) = :year";
-            $params[':year'] = $filters['year'];
+        if (!empty($filters['role'])) {
+            $sql .= " AND u.role = :role";
+            $params[':role'] = $filters['role'];
         }
-        $sql .= " ORDER BY a.tanggal DESC, a.waktu_masuk DESC LIMIT :limit OFFSET :offset";
+
+        // --- LOGIKA TANGGAL BARU ---
+        if (!empty($filters['specific_date'])) {
+            $sql .= " AND a.tanggal = :spec_date";
+            $params[':spec_date'] = $filters['specific_date'];
+        } else {
+            if (!empty($filters['start_date'])) {
+                $sql .= " AND a.tanggal >= :start";
+                $params[':start'] = $filters['start_date'];
+            }
+            if (!empty($filters['end_date'])) {
+                $sql .= " AND a.tanggal <= :end";
+                $params[':end'] = $filters['end_date'];
+            }
+        }
+
+        $sql .= " ORDER BY a.tanggal DESC, a.waktu_masuk ASC LIMIT :limit OFFSET :offset"; // Urutkan berdasarkan jam masuk agar rapi
         $params[':limit'] = $limit;
         $params[':offset'] = $offset;
+        
         $this->query($sql);
         foreach ($params as $key => &$value) {
             $type = ($key == ':limit' || $key == ':offset') ? PDO::PARAM_INT : PDO::PARAM_STR;
-            if (in_array($key, [':month', ':year'])) {
-                $type = PDO::PARAM_INT;
-            }
             $this->bind($key, $value, $type);
         }      
         return $this->resultSet();
@@ -159,17 +203,21 @@ class Absensi_model extends Model {
 
     /**
      * [ADMIN] Update manual data absensi (Status, Jam, Keterangan, Bukti)
-     * REVISI: Bisa menghapus bukti foto (Set NULL)
      */
     public function updateAbsensi($data) {
-        // Query dasar
+        // Query dasar update
         $sql = "UPDATE " . $this->table . " SET 
                     status = :status,
                     waktu_masuk = :masuk, 
                     waktu_pulang = :pulang,
                     keterangan = :keterangan";
         
-        // PERBAIKAN: Gunakan array_key_exists agar bisa mendeteksi request penghapusan (null)
+        // Logika Update Foto:
+        // 1. Jika key 'bukti_foto' ADA di array $data, berarti kita mau update kolom bukti_foto.
+        // 2. Jika nilainya NULL (kasus ubah ke Hadir), file dihapus dari DB.
+        // 3. Jika nilainya String (kasus upload baru), file diupdate.
+        // 4. Jika key TIDAK ADA, berarti file lama dibiarkan (tidak diubah).
+        
         if (array_key_exists('bukti_foto', $data)) {
             $sql .= ", bukti_foto = :bukti";
         }
@@ -180,8 +228,8 @@ class Absensi_model extends Model {
 
         // Binding data wajib
         $this->bind('status', $data['status']);
-        $this->bind('masuk', $data['waktu_masuk']);
-        $this->bind('pulang', $data['waktu_pulang']);
+        $this->bind('masuk', $data['waktu_masuk']); // Model.php akan otomatis set ke NULL jika nilainya null
+        $this->bind('pulang', $data['waktu_pulang']); 
         $this->bind('keterangan', $data['keterangan']);
         $this->bind('id', $data['absen_id']);
 
@@ -191,5 +239,53 @@ class Absensi_model extends Model {
         }
         
         return $this->execute();
+    }
+    /**
+     * [EXPORT] Ambil SEMUA data absensi sesuai filter (Tanpa Paginasi)
+     */
+    public function getAllAbsensiForExport($filters = []) {
+        $sql = "SELECT a.tanggal, a.waktu_masuk, a.waktu_pulang, a.status, a.keterangan, 
+                       u.nama_lengkap, u.role, u.email 
+                FROM " . $this->table . " a
+                LEFT JOIN users u ON a.user_id = u.user_id
+                WHERE 1=1";
+        
+        $params = [];
+
+        // 1. Filter Pencarian
+        if (!empty($filters['search'])) {
+            $sql .= " AND (u.nama_lengkap LIKE :search OR u.email LIKE :search)";
+            $params[':search'] = '%' . $filters['search'] . '%';
+        }
+
+        // 2. Filter Role
+        if (!empty($filters['role'])) {
+            $sql .= " AND u.role = :role";
+            $params[':role'] = $filters['role'];
+        }
+
+        // 3. Filter User Spesifik
+        if (!empty($filters['user_id'])) {
+            $sql .= " AND a.user_id = :uid";
+            $params[':uid'] = $filters['user_id'];
+        }
+
+        // 4. Filter Range Tanggal
+        if (!empty($filters['start_date'])) {
+            $sql .= " AND a.tanggal >= :start";
+            $params[':start'] = $filters['start_date'];
+        }
+        if (!empty($filters['end_date'])) {
+            $sql .= " AND a.tanggal <= :end";
+            $params[':end'] = $filters['end_date'];
+        }
+
+        $sql .= " ORDER BY a.tanggal ASC, u.nama_lengkap ASC"; // Urutkan biar rapi di Excel
+
+        $this->query($sql);
+        foreach ($params as $key => $value) {
+            $this->bind($key, $value);
+        }
+        return $this->resultSet();
     }
 }
