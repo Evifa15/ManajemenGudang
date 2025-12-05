@@ -382,6 +382,83 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+    // --- LOGIKA TOMBOL RESET (BARU) ---
+        const btnResetFilter = document.getElementById('btnResetFilter');
+        if (btnResetFilter) {
+            btnResetFilter.addEventListener('click', function() {
+                // 1. Kosongkan semua input filter dropdown
+                if(filterKategori) filterKategori.value = '';
+                if(filterMerek) filterMerek.value = '';
+                if(filterStatus) filterStatus.value = '';
+                if(filterLokasi) filterLokasi.value = '';
+                
+                // 2. Kosongkan search bar
+                liveSearchBarang.value = '';
+
+                // 3. Muat ulang data tabel (AJAX) - Card filter tetap terbuka
+                loadBarang(1);
+            });
+        }
+        /* =========================================
+       GLOBAL DELETE HANDLER (SOLUSI FINAL)
+       Menangani semua tombol dengan class '.btn-delete' di halaman manapun
+       ========================================= */
+    document.body.addEventListener('click', function(e) {
+        // Deteksi klik pada tombol delete atau icon di dalamnya
+        const deleteBtn = e.target.closest('.btn-delete');
+
+        if (deleteBtn) {
+            e.preventDefault(); // Matikan aksi default
+            e.stopPropagation(); // Hentikan event bubbling
+
+            // Ambil URL dari atribut data-url
+            const url = deleteBtn.getAttribute('data-url');
+
+            if (url) {
+                // Tampilkan SweetAlert Konfirmasi
+                Swal.fire({
+                    title: 'Yakin Hapus Data?',
+                    text: "Data yang dihapus (termasuk stok) hilang permanen!",
+                    icon: 'warning',
+                    
+                    // Style Warna Brand
+                    iconColor: '#152e4d',          
+                    confirmButtonColor: '#152e4d', 
+                    cancelButtonColor: '#f8c21a',  
+                    
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Hapus!',
+                    cancelButtonText: 'Batal',
+                    reverseButtons: true, // Tombol batal di kiri
+                    
+                    didOpen: () => {
+                        // Styling tombol batal agar teksnya biru
+                        const cancelBtn = Swal.getCancelButton();
+                        if (cancelBtn) {
+                            cancelBtn.style.color = '#152e4d';
+                            cancelBtn.style.fontWeight = 'bold';
+                        }
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Tampilkan Loading
+                        Swal.fire({
+                            title: 'Sedang Menghapus...',
+                            text: 'Mohon tunggu sebentar.',
+                            showConfirmButton: false,
+                            allowOutsideClick: false,
+                            didOpen: () => { Swal.showLoading(); }
+                        });
+                        
+                        // Redirect ke URL penghapusan
+                        window.location.href = url;
+                    }
+                });
+            } else {
+                console.error('Error: Atribut data-url tidak ditemukan pada tombol delete.');
+            }
+        }
+    });
 
     /* =========================================
        4. FITUR REKAP ABSENSI (ADMIN) - LIVE SEARCH & FILTER
@@ -693,8 +770,8 @@ document.addEventListener('DOMContentLoaded', function() {
             html += '</ul></nav>';
             
             // Info teks (opsional, buat pemanis)
-            const infoText = `<span style="margin-right: 15px; color: #64748b; font-size: 0.85rem; align-self: center;">
-                                Menampilkan ${totalRows > 0 ? start + 1 : 0} - ${Math.min(end, totalRows)} dari ${totalRows} data
+            const infoText = `<span class="pagination-info">
+                                Menampilkan Halaman ${currentPage} dari ${totalPages}
                               </span>`;
             
             // Render ke HTML
@@ -715,6 +792,47 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
             });
+            masterDataPage.addEventListener('click', function(e) {
+        // 1. [FIX] Cari tombol dengan class 'btn-delete' (sesuai PHP)
+        // Kita gunakan closest agar icon di dalam tombol juga bisa diklik
+        const deleteBtn = e.target.closest('.btn-delete');
+        
+        if (deleteBtn) {
+            e.preventDefault(); 
+            
+            // 2. [FIX] Ambil URL dari 'data-url' (karena elemen button, bukan a href)
+            const url = deleteBtn.getAttribute('data-url'); 
+            
+            if (url) {
+                Swal.fire({
+                    title: 'Hapus Data Ini?',
+                    text: "Data yang dihapus tidak dapat dikembalikan!",
+                    icon: 'warning',
+                    iconColor: '#152e4d',
+                    showCancelButton: true,
+                    confirmButtonColor: '#152e4d',
+                    cancelButtonColor: '#f8c21a',
+                    confirmButtonText: 'Ya, Hapus!',
+                    cancelButtonText: 'Batal',
+                    reverseButtons: true,
+                    didOpen: () => {
+                        const cancelBtn = Swal.getCancelButton();
+                        if (cancelBtn) {
+                            cancelBtn.style.color = '#152e4d';
+                            cancelBtn.style.fontWeight = 'bold';
+                        }
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Redirect ke URL penghapusan
+                        window.location.href = url;
+                    }
+                });
+            } else {
+                console.error('URL penghapusan tidak ditemukan pada tombol!');
+            }
+        }
+    });
         }
 
         function filterAndPaginate() {
@@ -755,15 +873,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function updateActionButtons(activeLink, checkedCount) {
             if(!activeLink) return;
+            
+            // Update tombol tambah (tetap sama)
             btnMasterAdd.setAttribute('href', activeLink.dataset.addUrl);
             btnMasterAdd.textContent = '+ Tambah ' + activeLink.textContent;
+            
+            // Update tombol hapus (INI YANG DIPERBAIKI)
             btnBulkDeleteTab.setAttribute('data-url', activeLink.dataset.deleteUrl);
             
             if (checkedCount > 0) {
-                btnBulkDeleteTab.style.display = 'inline-block';
-                btnBulkDeleteTab.textContent = `🗑️ Hapus Terpilih (${checkedCount})`;
+                // KONDISI SAAT ADA YANG DICENTANG
+                btnBulkDeleteTab.style.display = 'inline-flex'; // Gunakan flex agar icon rapi
+                
+                // Ubah teks dan masukkan angka, tapi PERTAHANKAN ICON-nya
+                btnBulkDeleteTab.innerHTML = `<i class="ph ph-trash"></i> Hapus Terpilih (${checkedCount})`;
             } else {
+                // KONDISI SAAT KOSONG (0)
                 btnBulkDeleteTab.style.display = 'none';
+                
+                // [SOLUSI]: Kembalikan teks ke posisi awal (Reset)
+                btnBulkDeleteTab.innerHTML = `<i class="ph ph-trash"></i> Hapus Terpilih`; 
             }
         }
 
@@ -1374,133 +1503,233 @@ document.addEventListener('DOMContentLoaded', function() {
 
     
     /* =========================================
-       16. FITUR EXPORT SELECTOR (ADMIN) - [NEW]
+       16. FITUR EXPORT DROPDOWN & DIRECT DOWNLOAD
        ========================================= */
-    const btnExportSelector = document.getElementById('btnExportSelector');
-    if (btnExportSelector) {
-        // Ambil base URL dari input search atau atribut lain yang ada
-        const searchInput = document.getElementById('liveSearchBarang');
-        const baseUrl = searchInput ? searchInput.dataset.baseUrl : '';
+    
+    // A. Logika Buka/Tutup Dropdown
+    const btnToggleExport = document.getElementById('btnToggleExport');
+    const exportMenu = document.getElementById('exportMenu');
 
-        btnExportSelector.addEventListener('click', function() {
-            Swal.fire({
-                title: 'Pilih Format Export',
-                
-                // Gunakan HTML custom untuk icon dan instruksi
-                html: `
-                    <div style="text-align: center; margin-bottom: 20px; padding-top: 10px;">
-                        <i class="ph ph-file-arrow-down" style="font-size: 3.5rem; color: var(--primer-lightblue);"></i>
-                        <p style="margin-top: 10px; font-size: 0.95em;">Silakan pilih format file yang ingin diunduh:</p>
-                    </div>
-                `,
-                
-                // --- PENGATURAN TOMBOL ---
-                showCancelButton: true,
-                showDenyButton: true, // WAJIB TRUE karena ada 3 pilihan
-                
-                // Urutan default: Deny, Cancel, Confirm.
-                // Kita akan override warnanya agar lebih rapi.
-                
-                confirmButtonText: 'Excel (.xls)',
-                confirmButtonColor: '#10b981', // Warna Green (Success Color)
-                
-                denyButtonText: 'CSV (.csv)',
-                denyButtonColor: '#152e4d',    // Warna Dark Blue (Brand Dark)
-                
-                cancelButtonText: 'Batal',
-                cancelButtonColor: '#6c757d'   // Warna Grey (Netral)
+    if (btnToggleExport && exportMenu) {
+        btnToggleExport.addEventListener('click', function(e) {
+            e.stopPropagation(); // Mencegah klik tembus ke window
+            exportMenu.classList.toggle('show');
+        });
 
-            }).then((result) => {
-                // Ambil nilai filter saat ini
-                const searchVal = document.getElementById('liveSearchBarang').value;
-                const startDateVal = document.getElementById('startDateMasuk')?.value || ''; // Optional chaining
-                const endDateVal = document.getElementById('endDateMasuk')?.value || '';
+        // Klik di luar menu -> Tutup menu
+        window.addEventListener('click', function(e) {
+            if (!btnToggleExport.contains(e.target) && !exportMenu.contains(e.target)) {
+                exportMenu.classList.remove('show');
+            }
+        });
+    }
+
+    // B. Logika Klik Item Export (Direct Download)
+    const exportLinks = document.querySelectorAll('.btn-export-action');
+    if (exportLinks.length > 0) {
+        exportLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Tutup menu setelah diklik
+                if(exportMenu) exportMenu.classList.remove('show');
+
+                const type = this.getAttribute('data-type');
+                const baseUrl = this.getAttribute('data-base-url');
+                
+                // Ambil Filter Aktif dari Halaman
+                const searchVal = document.getElementById('liveSearchBarang') ? document.getElementById('liveSearchBarang').value : '';
+                const filterKategori = document.getElementById('filterKategori') ? document.getElementById('filterKategori').value : '';
+                const filterMerek = document.getElementById('filterMerek') ? document.getElementById('filterMerek').value : '';
+                const filterStatus = document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : '';
+                const filterLokasi = document.getElementById('filterLokasi') ? document.getElementById('filterLokasi').value : '';
 
                 const params = new URLSearchParams({
                     search: searchVal,
-                    start_date: startDateVal,
-                    end_date: endDateVal
+                    kategori: filterKategori,
+                    merek: filterMerek,
+                    status: filterStatus,
+                    lokasi: filterLokasi
                 });
 
-                if (result.isConfirmed) {
-                    // User pilih Excel
-                    window.location.href = baseUrl + 'admin/exportBarang/excel?' + params.toString();
-                } else if (result.isDenied) {
-                    // User pilih CSV
-                    window.location.href = baseUrl + 'admin/exportBarang/csv?' + params.toString();
+                // Tampilkan Loading Indikator
+                Swal.fire({
+                    title: 'Sedang Memproses...',
+                    text: 'Menyiapkan file ' + type.toUpperCase(),
+                    timer: 2000,
+                    showConfirmButton: false,
+                    didOpen: () => { Swal.showLoading(); }
+                });
+
+                // --- LOGIKA DOWNLOAD ---
+                if (type === 'pdf') {
+                    // PDF: Fetch HTML -> Convert to PDF (Client Side)
+                    fetch(baseUrl + 'admin/exportBarang/pdf?' + params.toString())
+                        .then(response => response.text())
+                        .then(htmlContent => {
+                            // Buat wadah sementara
+                            const container = document.createElement('div');
+                            container.innerHTML = htmlContent;
+                            
+                            // Opsi PDF
+                            const opt = {
+                                margin: 10,
+                                filename: `Laporan_Stok_${new Date().toISOString().slice(0,10)}.pdf`,
+                                image: { type: 'jpeg', quality: 0.98 },
+                                html2canvas: { scale: 2 },
+                                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                            };
+
+                            // Generate & Download
+                            html2pdf().set(opt).from(container).save().then(() => {
+                                Swal.close(); // Tutup loading setelah selesai
+                            });
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            Swal.fire('Gagal', 'Terjadi kesalahan saat membuat PDF.', 'error');
+                        });
+
+                } else {
+                    // Excel & CSV: Redirect langsung (Browser handle download)
+                    setTimeout(() => {
+                        window.location.href = `${baseUrl}admin/exportBarang/${type}?${params.toString()}`;
+                    }, 500);
                 }
             });
         });
     }
+
     /* =========================================
-       17. FITUR IMPORT CSV BARANG (ADMIN) - [REVISI UI]
+       17. FITUR IMPORT CSV BARANG (ADMIN) - [REVISI STYLE DESIGN]
        ========================================= */
     const btnImportCsv = document.getElementById('btnImportCsv');
     if (btnImportCsv) {
+        // Ambil Base URL (bisa dari input search atau elemen main)
         const searchInput = document.getElementById('liveSearchBarang');
-        const baseUrl = searchInput ? searchInput.dataset.baseUrl : '';
+        const mainContent = document.querySelector('main');
+        const baseUrl = searchInput ? searchInput.dataset.baseUrl : (mainContent ? mainContent.dataset.baseUrl : '');
 
         btnImportCsv.addEventListener('click', function() {
             Swal.fire({
                 title: 'Import Data Barang',
-                // HTML Custom (Biarkan sama seperti sebelumnya)
                 html: `
                     <form id="formImportBarang" action="${baseUrl}admin/processImportBarang" method="POST" enctype="multipart/form-data">
+                        
                         <div class="import-instruction-box">
-                            <strong>Format Kolom CSV (Tanpa Header):</strong>
+                            <strong>Format Kolom CSV (Urutan Wajib):</strong>
                             <ul>
-                                <li>1. Kode Barang (Wajib, Unik)</li>
-                                <li>2. Nama Barang (Wajib)</li>
-                                <li>3. Kategori (Teks, misal: "Sabun")</li>
-                                <li>4. Merek (Teks, misal: "Lifebuoy")</li>
-                                <li>5. Satuan (Teks, misal: "Pcs")</li>
-                                <li>6. Stok Awal (Angka)</li>
-                                <li>7. Lokasi (Kode Rak, misal: "A1-01")</li>
+                                <li>1. Kode Barang <span style="color:#ef4444; font-size:0.8em; font-weight:bold;">(Wajib, Unik)</span></li>
+                                <li>2. Nama Barang <span style="color:#ef4444; font-size:0.8em; font-weight:bold;">(Wajib)</span></li>
+                                <li>3. Kategori <span style="color:#94a3b8; font-size:0.8em;">(Teks, misal: "Sabun")</span></li>
+                                <li>4. Merek <span style="color:#94a3b8; font-size:0.8em;">(Teks, misal: "Lifebuoy")</span></li>
+                                <li>5. Satuan <span style="color:#94a3b8; font-size:0.8em;">(Teks, misal: "Pcs")</span></li>
+                                <li>6. Stok Awal <span style="color:#94a3b8; font-size:0.8em;">(Angka)</span></li>
+                                <li>7. Lokasi <span style="color:#94a3b8; font-size:0.8em;">(Kode Rak)</span></li>
                             </ul>
+                            <div style="margin-top: 8px; font-size: 0.85rem; border-top: 1px dashed #e2e8f0; padding-top: 5px;">
+                                <i class="ph ph-download-simple" style="color: #0ea5e9;"></i> 
+                                <a href="${baseUrl}assets/template_import_barang.csv" download style="color: #0ea5e9; text-decoration: none; font-weight: 600;">Download Template CSV</a>
+                            </div>
                         </div>
-                        <div class="custom-file-upload" id="dropZone">
-                            <input type="file" name="csv_file" id="csvFileInput" class="hidden-input-file" accept=".csv, .txt" required>
+                        
+                        <div class="custom-file-upload" id="dropZoneBarang">
+                            <input type="file" name="csv_file" id="csvFileInputBarang" class="hidden-input-file" accept=".csv" required>
                             <i class="ph ph-file-csv"></i>
                             <span class="main-text">Klik atau Tarik File CSV ke Sini</span>
                             <span class="sub-text">Maksimal ukuran file 2MB</span>
                         </div>
-                        <div id="fileNameDisplay" class="selected-file-name"></div>
+                        
+                        <div id="fileNameDisplayBarang" class="selected-file-name"></div>
                     </form>
                 `,
                 
-                // --- PENGATURAN TOMBOL (FIXED) ---
-               showCancelButton: true,     // Tampilkan tombol Batal
-                showDenyButton: false,      // <--- INI KUNCI UNTUK MENGHILANGKAN TOMBOL "NO"
-                showConfirmButton: true,
-                confirmButtonText: 'Upload & Proses',
+                // --- Styling Tombol (Konsisten Biru Tua & Kuning) ---
+                showCancelButton: true,
+                confirmButtonText: 'Upload & Import',
                 cancelButtonText: 'Batal',
-                confirmButtonColor: '#152e4d', 
-                cancelButtonColor: '#ef4444',  
-                reverseButtons: true,       // Urutan tombol yang benar
                 
-                // Logic Javascript (Tetap sama)
+                confirmButtonColor: '#152e4d', // Biru Tua Brand
+                cancelButtonColor: '#f8c21a',  // Kuning Brand
+                
+                reverseButtons: true,
+                
                 didOpen: () => {
-                    const fileInput = document.getElementById('csvFileInput');
-                    const fileNameDisplay = document.getElementById('fileNameDisplay');
-                    const dropZone = document.getElementById('dropZone');
-                    const mainText = dropZone.querySelector('.main-text');
+                    // 1. Styling Teks Tombol Batal (Agar kontras)
+                    const cancelBtn = Swal.getCancelButton();
+                    if (cancelBtn) {
+                        cancelBtn.style.color = '#152e4d';
+                        cancelBtn.style.fontWeight = 'bold';
+                    }
 
+                    // 2. Inisialisasi Elemen Upload
+                    const fileInput = document.getElementById('csvFileInputBarang');
+                    const fileNameDisplay = document.getElementById('fileNameDisplayBarang');
+                    const dropZone = document.getElementById('dropZoneBarang');
+                    const mainText = dropZone.querySelector('.main-text');
+                    const iconElement = dropZone.querySelector('i');
+
+                    // Fungsi Helper Update Tampilan
+                    const updateFileUI = (file) => {
+                        fileNameDisplay.innerHTML = `
+                            <div style="background: #ecfdf5; border: 1px solid #10b981; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                                <i class="ph ph-check-circle" style="color: #10b981; font-size: 1.2rem;"></i>
+                                <div style="text-align: left;">
+                                    <strong style="color: #064e3b; display: block; font-size: 0.9rem;">File Siap:</strong>
+                                    <span style="color: #065f46; font-size: 0.85rem;">${file.name}</span>
+                                </div>
+                            </div>
+                        `;
+                        fileNameDisplay.style.display = 'block';
+                        
+                        // Ubah status dropzone jadi sukses
+                        dropZone.style.borderColor = '#10b981';
+                        dropZone.style.backgroundColor = '#f0fdf4';
+                        iconElement.style.color = '#10b981';
+                        iconElement.classList.replace('ph-file-csv', 'ph-check');
+                        mainText.innerText = "Ganti File?";
+                    };
+
+                    // Event A: User Klik Manual
                     fileInput.addEventListener('change', function() {
                         if (this.files && this.files.length > 0) {
-                            const name = this.files[0].name;
-                            fileNameDisplay.innerHTML = `📄 File terpilih: ${name}`;
-                            fileNameDisplay.style.display = 'block';
-                            
-                            dropZone.style.borderColor = '#10b981';
-                            dropZone.style.backgroundColor = '#ecfdf5';
-                            mainText.innerText = "Ganti File?";
+                            updateFileUI(this.files[0]);
+                        }
+                    });
+
+                    // Event B: Drag Over (File diseret masuk)
+                    dropZone.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        dropZone.style.borderColor = '#152e4d'; // Biru Tua
+                        dropZone.style.backgroundColor = '#e0f2fe'; // Biru Muda Soft
+                        iconElement.style.color = '#152e4d';
+                    });
+
+                    // Event C: Drag Leave (File keluar area)
+                    dropZone.addEventListener('dragleave', (e) => {
+                        e.preventDefault();
+                        // Reset hanya jika belum ada file yang dipilih
+                        if (!fileInput.files.length) {
+                            dropZone.style.borderColor = '#cbd5e1';
+                            dropZone.style.backgroundColor = '#ffffff';
+                            iconElement.style.color = ''; // Reset warna default css
+                        }
+                    });
+
+                    // Event D: Drop (File dilepaskan)
+                    dropZone.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        if (e.dataTransfer.files.length > 0) {
+                            fileInput.files = e.dataTransfer.files; // Assign file ke input
+                            updateFileUI(e.dataTransfer.files[0]);  // Update UI
                         }
                     });
                 },
 
                 preConfirm: () => {
                     const form = document.getElementById('formImportBarang');
-                    const fileInput = form.querySelector('input[type="file"]');
+                    const fileInput = document.getElementById('csvFileInputBarang');
+                    
                     if (!fileInput.files.length) {
                         Swal.showValidationMessage('⚠️ Silakan pilih file CSV terlebih dahulu!');
                         return false;
@@ -1510,6 +1739,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
     /* =========================================
        18. FITUR AUTO GENERATE KODE BARANG (ADMIN) - [NEW]
        ========================================= */
@@ -1597,33 +1827,58 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
     /* =========================================
-       20. FITUR EXPORT RIWAYAT MASUK (ADMIN) - [NEW]
+       20. FITUR EXPORT RIWAYAT MASUK (ADMIN) - [REVISI STYLE]
        ========================================= */
     const btnExportMasuk = document.getElementById('btnExportMasuk');
     if (btnExportMasuk) {
         btnExportMasuk.addEventListener('click', function() {
-            // Ambil nilai filter saat ini
-            const searchVal = document.getElementById('liveSearchMasuk').value;
-            const startDateVal = document.getElementById('startDateMasuk').value;
-            const endDateVal = document.getElementById('endDateMasuk').value;
-            
-            // Ambil base URL (dari atribut di main atau input search)
+            // Base URL
             const baseUrl = document.querySelector('main').getAttribute('data-base-url');
 
             Swal.fire({
-                title: 'Pilih Format Export',
-                text: 'Silakan pilih format file yang diinginkan:',
-                icon: 'question',
+                title: 'Export Riwayat Masuk',
+                html: `
+                    <div style="display: flex; justify-content: center; gap: 30px; margin: 25px 0;">
+                        <div style="text-align: center;">
+                            <div style="width: 70px; height: 70px; background: #dcfce7; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
+                                <i class="ph ph-microsoft-excel-logo" style="font-size: 2.5rem; color: #10b981;"></i>
+                            </div>
+                            <span style="font-weight: 700; color: #152e4d; font-size: 0.9rem;">Excel</span>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="width: 70px; height: 70px; background: #e0f2fe; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
+                                <i class="ph ph-file-csv" style="font-size: 2.5rem; color: #152e4d;"></i>
+                            </div>
+                            <span style="font-weight: 700; color: #152e4d; font-size: 0.9rem;">CSV</span>
+                        </div>
+                    </div>
+                    <p style="color: #64748b; font-size: 0.95rem; margin-bottom: 5px;">
+                        Pilih format laporan yang diinginkan.
+                    </p>
+                `,
                 showCancelButton: true,
                 showDenyButton: true,
-                confirmButtonText: '📄 Excel (.xls)',
-                confirmButtonColor: '#217346',
-                denyButtonText: '📝 CSV (.csv)',
-                denyButtonColor: '#6c757d',
-                cancelButtonText: 'Batal'
+                confirmButtonText: '<i class="ph ph-download-simple"></i> Download Excel',
+                confirmButtonColor: '#10b981',
+                denyButtonText: '<i class="ph ph-download-simple"></i> Download CSV',
+                denyButtonColor: '#152e4d',
+                cancelButtonText: 'Batal',
+                cancelButtonColor: '#f8c21a',
+                reverseButtons: true,
+                didOpen: () => {
+                    const cancelBtn = Swal.getCancelButton();
+                    if (cancelBtn) {
+                        cancelBtn.style.color = '#152e4d';
+                        cancelBtn.style.fontWeight = 'bold';
+                    }
+                }
             }).then((result) => {
-                let exportUrl = '';
+                const searchVal = document.getElementById('liveSearchMasuk').value;
+                const startDateVal = document.getElementById('startDateMasuk').value;
+                const endDateVal = document.getElementById('endDateMasuk').value;
+
                 const params = new URLSearchParams({
                     search: searchVal,
                     start_date: startDateVal,
@@ -1631,13 +1886,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 if (result.isConfirmed) {
-                    // Excel
-                    exportUrl = `${baseUrl}admin/exportRiwayatMasuk/excel?${params.toString()}`;
-                    window.location.href = exportUrl;
+                    window.location.href = `${baseUrl}admin/exportRiwayatMasuk/excel?${params.toString()}`;
                 } else if (result.isDenied) {
-                    // CSV
-                    exportUrl = `${baseUrl}admin/exportRiwayatMasuk/csv?${params.toString()}`;
-                    window.location.href = exportUrl;
+                    window.location.href = `${baseUrl}admin/exportRiwayatMasuk/csv?${params.toString()}`;
                 }
             });
         });
@@ -2199,27 +2450,29 @@ function showIzinModal(actionUrl) {
     });
 }
 
+// FILE: public/js/main.js
+
 function renderPaginationUniversal(container, totalPages, currentPage, callbackFunction) {
      if (!container) return;
      
      currentPage = parseInt(currentPage);
      totalPages = parseInt(totalPages);
      
-     // REVISI: Jangan sembunyikan pagination meski halamannya cuma 1.
-     // Biarkan tetap render agar layout tidak 'lompat'.
      if (totalPages < 1) totalPages = 1; 
      
+     // [BARU] Buat HTML Teks Info
+     const infoText = `<span class="pagination-info">Menampilkan Halaman ${currentPage} dari ${totalPages}</span>`;
+
      let html = '<nav><ul class="pagination">';
      
-     // 1. Tombol Previous
+     // Tombol Previous
      const prevDisabled = currentPage === 1 ? 'disabled' : '';
      html += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a></li>`;
      
-     // 2. Tombol Angka
+     // Tombol Angka
      let start = Math.max(1, currentPage - 2);
      let end = Math.min(totalPages, currentPage + 2);
 
-     // Logika tambahan agar angka tetap cantik jika total page sedikit
      if (totalPages <= 5) {
          start = 1;
          end = totalPages;
@@ -2230,20 +2483,20 @@ function renderPaginationUniversal(container, totalPages, currentPage, callbackF
          html += `<li class="page-item ${active}"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
      }
      
-     // 3. Tombol Next
+     // Tombol Next
      const nextDisabled = currentPage === totalPages ? 'disabled' : '';
      html += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" data-page="${currentPage + 1}">Next</a></li>`;
      
      html += '</ul></nav>';
      
-     container.innerHTML = html;
+     // [UPDATE] Masukkan Teks Info + Tombol Pagination
+     container.innerHTML = infoText + html;
 
      // Re-attach event listeners
      const links = container.querySelectorAll('.page-link');
      links.forEach(link => {
          link.addEventListener('click', (e) => {
              e.preventDefault();
-             // Mencegah klik jika disabled atau active
              const li = e.target.parentElement;
              if (!li.classList.contains('disabled') && !li.classList.contains('active')) {
                  callbackFunction(parseInt(e.target.dataset.page));
@@ -2457,5 +2710,69 @@ window.showDetailKeterangan = function(text) {
         }
     });
 };
+/* =========================================
+       25. UPLOAD FOTO BARANG DRAG & DROP (ADMIN)
+       ========================================= */
+    const dropZoneBarang = document.getElementById('drop_zone_barang');
+    
+    if (dropZoneBarang) {
+        const fileInput = document.getElementById('foto_barang');
+        const labelFile = document.getElementById('label_file_barang');
+        const previewImg = document.getElementById('previewFoto');
 
+        const updatePreview = (file) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if(previewImg) previewImg.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+
+            labelFile.innerHTML = `
+                <i class="ph ph-check-circle" style="font-size: 1.5rem; color: #10b981; margin-bottom: 5px;"></i>
+                <span style="color: #152e4d; font-weight: bold;">${file.name}</span>
+            `;
+            dropZoneBarang.style.borderColor = '#10b981';
+            dropZoneBarang.style.backgroundColor = '#ecfdf5';
+        };
+
+        // 1. Change Event (Klik Manual)
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                updatePreview(this.files[0]);
+            }
+        });
+
+        // 2. Drag Over
+        dropZoneBarang.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZoneBarang.style.borderColor = '#152e4d';
+            dropZoneBarang.style.backgroundColor = '#e0f2fe';
+        });
+
+        // 3. Drag Leave
+        dropZoneBarang.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            // Cek jika belum ada file yang dipilih, kembalikan ke warna awal
+            if (!fileInput.files.length) {
+                dropZoneBarang.style.borderColor = '#cbd5e1';
+                dropZoneBarang.style.backgroundColor = '#ffffff';
+            }
+        });
+
+        // 4. Drop
+        dropZoneBarang.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                updatePreview(e.dataTransfer.files[0]);
+            }
+        });
+        
+        // Responsive Grid Adjustment (Optional JS fallback)
+        if (window.innerWidth <= 768) {
+            const grid = document.querySelector('.form-layout-grid');
+            if(grid) grid.style.gridTemplateColumns = '1fr';
+        }
+    }
+    
 

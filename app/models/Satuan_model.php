@@ -67,12 +67,17 @@ class Satuan_model extends Model {
     /**
      * Menyimpan data satuan baru ke database
      */
+    /**
+     * Menyimpan data satuan baru ke database
+     */
     public function createSatuan($data) {
-        $this->query("INSERT INTO " . $this->table . " (nama_satuan, singkatan) 
-                      VALUES (:nama_satuan, :singkatan)");
+        // Update Query: Tambahkan deskripsi
+        $this->query("INSERT INTO " . $this->table . " (nama_satuan, singkatan, deskripsi) 
+                      VALUES (:nama_satuan, :singkatan, :deskripsi)");
 
         $this->bind('nama_satuan', $data['nama_satuan']);
         $this->bind('singkatan', $data['singkatan']);
+        $this->bind('deskripsi', $data['deskripsi']); // Bind parameter
 
         return $this->execute();
     }
@@ -81,18 +86,24 @@ class Satuan_model extends Model {
      * Mengupdate data satuan di database
      */
     public function updateSatuan($data) {
+        // Update Query: Tambahkan deskripsi
         $this->query("UPDATE " . $this->table . " SET 
                         nama_satuan = :nama_satuan,
-                        singkatan = :singkatan
+                        singkatan = :singkatan,
+                        deskripsi = :deskripsi
                       WHERE satuan_id = :satuan_id");
 
         $this->bind('nama_satuan', $data['nama_satuan']);
         $this->bind('singkatan', $data['singkatan']);
+        $this->bind('deskripsi', $data['deskripsi']); // Bind parameter
         $this->bind('satuan_id', $data['satuan_id'], PDO::PARAM_INT);
 
         return $this->execute();
     }
+    
 
+
+    
     /**
      * Menghapus data satuan dari database berdasarkan ID
      */

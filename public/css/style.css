@@ -1017,29 +1017,44 @@ tbody tr:hover { background-color: #f8fafc; }
 }
 
 /* =========================================
-   17. MASTER DATA TABLE TOOLBAR (NEW)
+   17. MASTER DATA TABLE TOOLBAR (FIXED FLUID)
    ========================================= */
 
-/* Container Toolbar (Baris Putih di atas tabel) */
+/* 1. Container Utama */
 .table-toolbar {
     background-color: #ffffff;
     padding: 15px 20px;
-    display: flex; /* INI KUNCINYA: Biar sejajar ke samping */
-    justify-content: space-between; /* Search kiri, Tombol kanan */
+    display: flex;
+    justify-content: space-between;
     align-items: center;
+    
+    /* Border styling */
     border: 1px solid #e2e8f0;
-    /* Border agar menyatu dengan Tab di atasnya & Tabel di bawahnya */
-    border-left: 1px solid #e2e8f0; 
-    border-right: 1px solid #e2e8f0;
     border-bottom: 1px solid #f1f5f9;
     border-top-left-radius: 0;
     border-top-right-radius: 12px;
+    
+    /* KUNCI UTAMA: */
+    width: 100%;          /* Lebar penuh */
+    max-width: 100%;      /* Jangan pernah lebih dari 100% layar */
+    box-sizing: border-box; /* Padding dihitung dalam lebar */
+    gap: 15px;            /* Jarak antar elemen */
+    overflow: hidden;     /* Hapus scrollbar jika ada elemen bandel meluber dikit */
 }
 
-/* Wrapper Search Bar (Biar icon ada di dalam) */
+/* 2. Wrapper Search Bar (YANG HARUS MENGALAH/MENYUSUT) */
 .search-box-wrapper {
     position: relative;
-    width: 350px; /* Atur lebar search bar di sini */
+    
+    /* Flex Grow: 1 (Ambil sisa ruang) */
+    /* Flex Shrink: 10 (Sangat mudah menyusut jika sempit) */
+    /* Flex Basis: Auto */
+    flex: 1 10 auto; 
+    
+    max-width: 400px;    /* Batas maksimal saat lega */
+    min-width: 50px;     /* Batas minimal SANGAT KECIL supaya tidak bikin scrollbar */
+    
+    transition: all 0.2s ease-in-out; /* Animasi halus saat ukuran berubah */
 }
 
 .search-box-wrapper .search-icon {
@@ -1055,7 +1070,8 @@ tbody tr:hover { background-color: #f8fafc; }
 
 /* Input Search-nya */
 .table-search-input {
-    width: 100%;
+    width: 100% !important; /* Ikuti lebar wrapper induknya */
+    min-width: 0 !important; /* Pastikan input bisa mengecil */
     padding: 10px 15px 10px 45px;
     padding-left: 50px !important; 
     border: 1px solid #e2e8f0;
@@ -1065,58 +1081,41 @@ tbody tr:hover { background-color: #f8fafc; }
     color: var(--primer-darkblue);
     outline: none;
     transition: all 0.2s;
-
+    box-sizing: border-box;
 }
 
-.table-search-input:focus {
-    background-color: #ffffff;
-    border-color: var(--primer-lightblue);
-    box-shadow: 0 0 0 3px rgba(47, 139, 169, 0.1);
-}
-
-/* Group Tombol di Kanan */
+/* 3. Group Tombol di Kanan (TETAP UTUH) */
 .toolbar-actions {
     display: flex;
-    gap: 10px;
+    gap: 10px; 
     align-items: center;
+    justify-content: flex-end !important;
+    
+    /* Flex Grow: 0 (Jangan membesar) */
+    /* Flex Shrink: 0 (JANGAN MENYUSUT/GEPENG) */
+    flex: 0 0 auto; 
+    
+    white-space: nowrap; /* Teks tombol dilarang turun baris */
 }
 
-/* Perbaikan Tampilan Konten Tab agar border nyambung */
-.tab-content {
-    /* Hapus padding atas default karena sudah ada toolbar */
-    padding-top: 0 !important; 
-    box-shadow: none !important;
-    /* Pastikan border box menyatu */
-    background: transparent !important;
-    border: none !important;
-    border-right: 1px solid #e2e8f0;
-    border-bottom: 1px solid #e2e8f0;
-    border-bottom-left-radius: 12px;
-
-}
-
-/* Tabel nempel langsung ke toolbar (hilangkan margin atas tabel) */
-.table-wrapper-flat {
-    margin-top: 0 !important;
-    box-shadow: none !important;
-    width: 100%;
-    background-color: #ffffff; /* Pindahkan background putih ke sini */
-    border: 1px solid #e2e8f0; /* Pindahkan border ke sini */
-    border-top: none; /* Biar nempel sama toolbar */
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
-    margin-top: 0 !important;
-    padding-bottom: 10px;
-}
-
-
-/* Hilangkan radius atas tabel karena nempel toolbar */
-.table-wrapper-flat table thead th:first-child { border-top-left-radius: 0; }
-.table-wrapper-flat table thead th:last-child { border-top-right-radius: 0; }
-/* Hapus padding atas filter karena search bar sudah pindah */
-.search-card.compact-filter .filter-row {
-    padding-top: 10px; 
-    padding-bottom: 10px;
+/* --- RESPONSIVE MOBILE (Agar di HP Search bar turun ke bawah) --- */
+@media (max-width: 768px) {
+    .table-toolbar {
+        flex-wrap: wrap; /* Izinkan turun baris di layar kecil */
+        height: auto;
+    }
+    .search-box-wrapper {
+        order: 2; /* Pindah ke bawah */
+        width: 100%;
+        max-width: 100%; /* Full width di HP */
+        min-width: 100%;
+        margin-top: 10px;
+    }
+    .toolbar-actions {
+        order: 1; /* Tombol di atas */
+        width: 100%;
+        justify-content: space-between !important;
+    }
 }
 
 /* =========================================
@@ -1189,104 +1188,106 @@ tbody tr:hover { background-color: #f8fafc; }
    13. TABLE FLAT (TANPA CARD WRAPPER)
    ========================================= */
 
+/* =========================================
+   FIX: KOLOM AKSI & LEBAR TABEL
+   ========================================= */
+
+/* 1. Pastikan container tabel bisa di-scroll horizontal jika konten terlalu lebar */
 .table-wrapper-flat {
     width: 100%;
-    margin-top: 10px;
-    /* Reset Style Card */
-    background: transparent;
-    box-shadow: none;
-    padding: 0;
-    border: none;
-    border-radius: 0;
+    overflow-x: auto; /* Munculkan scrollbar bawah jika tabel terlalu lebar */
+    -webkit-overflow-scrolling: touch; /* Agar scroll mulus di HP/Tablet */
+    padding-bottom: 5px; /* Beri sedikit ruang untuk scrollbar */
 }
 
-/* Baris data dikasih warna putih biar tetap terbaca jelas */
-.table-wrapper-flat tbody tr {
-    background-color: #ffffff;
-    transition: background-color 0.2s;
+/* 2. Perbaikan Spesifik Kolom Terakhir (AKSI) */
+.table-wrapper-flat table th:last-child,
+.table-wrapper-flat table td:last-child {
+    /* Agar kolom tidak dipaksa mengecil */
+    white-space: nowrap; 
+    
+    /* Lebar minimal untuk menampung 4 tombol (34px * 4 + gaps) */
+    min-width: 190px;    
+    
+    /* Opsional: Jika ingin tombol mepet kanan */
+    /* text-align: right; */
 }
 
-/* Efek Hover pada baris */
-.table-wrapper-flat tbody tr:hover {
-    background-color: #f1f5f9;
+/* 3. (Opsional) Perkecil sedikit padding kolom lain agar muat lebih banyak */
+.table-wrapper-flat table td, 
+.table-wrapper-flat table th {
+    /* Kurangi padding kiri-kanan dari 15px jadi 10px agar lebih hemat tempat */
+    padding: 15px 10px; 
 }
 
-/* Garis pemisah antar baris diperjelas */
-.table-wrapper-flat tbody td {
-    border-bottom: 1px solid #e2e8f0;
+/* 4. Pastikan tombol di dalam kolom aksi tidak turun baris */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-start; /* Atau 'center' jika ingin di tengah */
+    flex-wrap: nowrap; /* DILARANG turun baris */
 }
-
-/* Border radius untuk baris pertama dan terakhir (Opsional, biar manis) */
-.table-wrapper-flat tbody tr:last-child td:first-child { border-bottom-left-radius: 8px; }
-.table-wrapper-flat tbody tr:last-child td:last-child { border-bottom-right-radius: 8px; }
 
 /* =========================================
    14. MINIMALIST ACTION BUTTONS
    ========================================= */
 
+/* Container Tombol */
 .action-buttons {
     display: flex;
-    gap: 8px; /* Jarak antar tombol */
+    gap: 8px;
     justify-content: flex-start;
     align-items: center;
 }
 
-/* Tombol Dasar (Ukuran & Bentuk Seragam) */
+/* STYLE DASAR SEMUA TOMBOL (Edit, Print, Detail, Delete) 
+   Dibuat seragam: Background Biru Muda, Icon Biru, Border Biru
+*/
 .btn-icon {
     width: 34px;
     height: 34px;
-    display: flex;
+    
+    /* Layout Centering */
+    display: inline-flex;    /* Gunakan inline-flex agar icon pas di tengah */
     align-items: center;
     justify-content: center;
-    border-radius: 8px; /* Sedikit lebih rounded biar modern */
-    border: 1px solid transparent;
-    background-color: transparent;
+    
+    border-radius: 8px;
     text-decoration: none;
     transition: all 0.2s ease;
     cursor: pointer;
+
+    /* WARNA SERAGAM (Biru Langit Soft) */
+    color: #0ea5e9;             /* Icon Biru */
+    background-color: #e0f2fe;  /* Background Biru Sangat Muda */
+    border: 1px solid #bae6fd;  /* Border Biru Muda */
 }
 
-/* Styling khusus tag <i> icon-nya */
-.btn-icon i {
-    font-size: 1.3rem; /* Ukuran icon pas */
-    font-weight: bold; /* Biar garis icon agak tebal */
-    line-height: 0; /* Reset line height biar center */
-}
-
-/* Efek Hover: Naik sedikit & muncul bayangan halus */
+/* Efek Hover untuk Semua Tombol */
 .btn-icon:hover {
-    transform: translateY(-2px);
+    background-color: #bae6fd;  /* Background jadi lebih gelap dikit */
+    color: #0284c7;             /* Icon jadi lebih gelap */
+    border-color: #0284c7;      /* Border menyesuaikan */
+    transform: translateY(-2px); /* Efek naik sedikit */
 }
 
-/* Warna Spesifik (Background Soft + Teks Warna) */
-/* Detail (Biru) */
-.btn-icon.detail {
-    color: #0ea5e9;
-    background-color: #e0f2fe;
-    border: 1px solid #bae6fd;
+/* Styling Khusus Tag <i> (Icon) di dalam Tombol */
+.btn-icon i {
+    font-size: 1.3rem;       /* Ukuran icon */
+    font-weight: normal;     /* Jangan bold agar tidak glitch */
+    display: inline-block;   /* Pastikan dirender sebagai blok inline */
+    line-height: 1;          /* Reset tinggi baris */
+    vertical-align: middle;  /* Posisi vertikal aman */
 }
 
-/* Cetak (Ungu/Indigo) */
-.btn-icon.print {
-    color: #6366f1;
-    background-color: #eef2ff;
-    border: 1px solid #c7d2fe;
-}
+/* OPSIONAL: Jika ingin membedakan warna sedikit (misal Edit jadi Kuning),
+   Anda bisa uncomment kode di bawah ini. 
+   Tapi sesuai request, kode di atas sudah membuat SEMUANYA BIRU.
+*/
 
-/* Edit (Kuning/Orange) */
-.btn-icon.edit {
-    color: #d97706;
-    background-color: #fffbeb;
-    border: 1px solid #fde68a;
-}
-
-/* Hapus (Merah) */
-.btn-icon.delete {
-    color: #ef4444;
-    background-color: #fef2f2;
-    border: 1px solid #fecaca;
-}
-
+/* .btn-icon.edit { color: #d97706; background: #fffbeb; border-color: #fde68a; }
+.btn-icon.edit:hover { background: #fde68a; color: #b45309; }
+*/
 /* =========================================
    15. PAGINATION STYLING (NAVIGASI HALAMAN)
    ========================================= */
@@ -1472,6 +1473,7 @@ tbody tr:hover { background-color: #f8fafc; }
 }
 
 /* Container Tab: Ini adalah "Garis Rel" tempat tab duduk */
+/* Container Tab: Ini adalah "Garis Rel" tempat tab duduk */
 .tab-nav {
     display: flex !important;
     flex-wrap: nowrap;
@@ -1480,23 +1482,21 @@ tbody tr:hover { background-color: #f8fafc; }
     border-bottom: 4px solid var(--primer-darkblue);
     padding: 0;
     
-    /* UBAH DI SINI: Hilangkan jarak atas */
     margin-top: 0 !important; 
-    
     margin-bottom: 0 !important;
-    align-items: flex-end; /* Penting agar button Kembali sejajar di bawah */
+    align-items: flex-end;
+    
+    /* [PERBAIKAN] KUNCI: Paksa elemen berjejer di kiri */
+    justify-content: flex-start; 
     
     scrollbar-width: none; 
     -ms-overflow-style: none;
-}
-.tab-nav::-webkit-scrollbar { 
-    display: none; 
 }
 
 /* Style Individual Tab (Bentuk Folder) */
 .tab-nav-link {
     display: block;
-    padding: 12px 20px; /* Padding lebih lebar agar gagah */
+    padding: 12px 20px; 
     text-decoration: none;
     font-weight: 600;
     font-size: 0.95rem;
@@ -1504,9 +1504,9 @@ tbody tr:hover { background-color: #f8fafc; }
     /* Warna Tab Tidak Aktif (Abu-abu soft) */
     background-color: #f1f5f9; 
     color: #64748b;
-    border: none; /* Hapus border keliling */
+    border: none;
     
-    /* BENTUK FOLDER: Radius hanya di atas kiri & kanan */
+    /* BENTUK FOLDER */
     border-radius: 12px 12px 0 0; 
     
     margin-bottom: 0px; 
@@ -1516,6 +1516,8 @@ tbody tr:hover { background-color: #f8fafc; }
     top: 0;
     transition: all 0.2s ease;
     
+    /* [PERBAIKAN] Jaga agar tab tidak melebar mengisi ruang kosong */
+    flex-shrink: 0; 
 }
 
 
@@ -1823,9 +1825,10 @@ select.filter-select-clean {
 }
 
 /* --- Koreksi Isi Tombol (Icon & Teks) --- */
-.btn i, .btn span {
-    display: inline-block;
-    vertical-align: middle;
+.btn i {
+    font-size: 1.2rem;
+    margin-right: 5px;
+    font-weight: normal; /* Pastikan tidak bold */
     line-height: 1;
 }
 
@@ -2044,28 +2047,38 @@ select.filter-select-clean {
     box-shadow: 0 6px 12px rgba(239, 68, 68, 0.3);
 }
 
-/* =========================================
-   27. STYLE KHUSUS REKAP ABSENSI
-   ========================================= */
-
-/* LAYOUT UTAMA: HEADER KONTROL
-   Mengatur posisi Tab (Kiri), Kontrol Tanggal (Tengah), dan Search (Kanan)
-   agar sejajar rapi dalam satu baris flexbox.
-*/
 .tab-nav {
     display: flex !important;
-    align-items: flex-end; /* Elemen sejajar di bawah */
-    justify-content: space-between; /* Sebar elemen ke kiri, tengah, kanan */
     flex-wrap: nowrap;
-    gap: 15px;
-    border-bottom: 4px solid var(--primer-darkblue); /* Garis bawah tab */
-    padding-bottom: 0;
+    overflow-x: auto;
+    gap: 4px;
+    border-bottom: 4px solid var(--primer-darkblue);
+    padding: 0;  
+    margin-top: 0 !important; 
     margin-bottom: 0 !important;
-    margin-top: 20px !important;
-    position: relative;
+    align-items: flex-end;
+    justify-content: flex-start !important; 
+    
+    scrollbar-width: none; 
+    -ms-overflow-style: none;
 }
 
-/* --- 1. NAVIGASI TAB (KIRI) --- */
+.tab-nav-link {
+    display: block;
+    padding: 12px 20px; 
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    flex-grow: 0 !important;   
+    margin-bottom: 0px; 
+    white-space: nowrap; 
+    cursor: pointer;
+    position: relative;
+    top: 0;
+    transition: all 0.2s ease;
+}
+
 .tab-links-group {
     display: flex;
     gap: 4px;
@@ -2083,17 +2096,14 @@ select.filter-select-clean {
     color: #ffffff;
 }
 
-/* --- 2. DATE NAVIGATOR (TENGAH) --- */
-/* Container untuk tombol prev/next, teks tanggal, dan tombol kalender.
-   Diletakkan di tengah menggunakan margin auto kiri-kanan.
-*/
+
 .date-controls-inline {
-    flex-grow: 1; /* Mengambil sisa ruang */
+    flex-grow: 1; 
     display: flex;
     align-items: center;
-    justify-content: center; /* Sentralisasi konten */
-    gap: 15px; /* Jarak antar elemen */
-    margin-bottom: 8px; /* Jarak dari garis bawah tab */
+    justify-content: center; 
+    gap: 15px; 
+    margin-bottom: 8px; 
     padding: 0 15px;
 }
 
@@ -2347,4 +2357,141 @@ select.filter-select-clean {
     background-color: #f8fafc;
     color: #94a3b8;
     cursor: not-allowed;
+}
+/* =========================================
+   29. CUSTOM BUTTONS (FORM BARANG)
+   ========================================= */
+
+/* Button Batal */
+.btn-batal-custom {
+    background-color: var(--primer-yellow); /* #f8c21a */
+    color: var(--primer-darkblue);          /* #152e4d */
+    border: 1px solid var(--primer-yellow);
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+.btn-batal-custom:hover {
+    background-color: #d9a511; /* Kuning lebih gelap */
+    border-color: #d9a511;
+    color: #ffffff !important; /* Teks berubah jadi PUTIH */
+}
+
+/* Button Simpan */
+.btn-simpan-custom {
+    background-color: var(--primer-darkblue); /* #152e4d */
+    color: #ffffff;
+    border: 1px solid var(--primer-darkblue);
+    padding: 12px 30px;
+    border-radius: 8px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.btn-simpan-custom:hover {
+    background-color: #0f233a; /* Biru lebih gelap */
+    border-color: #0f233a;
+    color: var(--primer-lightblue) !important; /* Teks berubah jadi BIRU MUDA */
+}
+/* Aturan dasar: Hapus semua efek transformasi/gerakan */
+.swal2-actions button {
+    transition: all 0.2s !important; 
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* 1. Button SIMPAN PERUBAHAN (swal2-confirm: BG Biru Tua) */
+.swal2-actions .swal2-confirm:hover {
+    /* Teks Putih (Default) -> Biru Muda */
+    color: var(--primer-lightblue) !important; 
+    /* Pertahankan warna background Biru Tua agar tidak bergeser */
+    background-color: var(--primer-darkblue) !important;
+    border-color: var(--primer-darkblue) !important;
+}
+
+/* 2. Button BATAL (swal2-cancel: BG Kuning) */
+.swal2-actions .swal2-cancel:hover {
+    /* Teks Dark Blue (Default) -> Putih */
+    color: #ffffff !important; 
+    /* Pertahankan warna background Kuning */
+    background-color: var(--primer-yellow) !important;
+    border-color: var(--primer-yellow) !important;
+}
+/* Tambahkan di public/css/style.css */
+
+.pagination-info {
+    margin-right: 15px;
+    color: #64748b;      /* Warna abu-abu soft */
+    font-size: 0.85rem;  /* Ukuran huruf sedikit kecil */
+    font-weight: 500;
+    align-self: center;
+}
+
+/* Pastikan container menggunakan flexbox */
+.pagination-container, 
+.pagination-container.custom-pagination, 
+.pagination-container-history {
+    display: flex;
+    justify-content: flex-end; /* Rata Kanan */
+    align-items: center;       /* Tengah secara vertikal */
+    gap: 10px;                 /* Jarak antar elemen */
+}
+/* =========================================
+   DROPDOWN EXPORT STYLE
+   ========================================= */
+.dropdown-export {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-menu {
+    display: none; /* Default Sembunyi */
+    position: absolute;
+    right: 0;
+    top: 110%; /* Jarak sedikit di bawah tombol */
+    background-color: #ffffff;
+    min-width: 180px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    z-index: 9999 !important; /* Agar selalu di atas tabel */
+    overflow: hidden;
+}
+
+/* Class .show akan ditambahkan via JS */
+.dropdown-menu.show {
+    display: block !important;
+    animation: slideDown 0.2s ease-out;
+}
+
+.dropdown-menu a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    text-decoration: none;
+    color: var(--primer-darkblue); /* Sesuaikan variabel warna */
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background 0.2s;
+    border-bottom: 1px solid #f8fafc;
+}
+
+.dropdown-menu a:hover {
+    background-color: #f0f9ff; /* Biru sangat muda saat hover */
+    color: var(--primer-lightblue);
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }

@@ -68,8 +68,10 @@ class Merek_model extends Model {
      * Menyimpan data merek baru ke database
      */
     public function createMerek($data) {
-        $this->query("INSERT INTO " . $this->table . " (nama_merek) VALUES (:nama_merek)");
+        // Tambahkan kolom deskripsi ke query INSERT
+        $this->query("INSERT INTO " . $this->table . " (nama_merek, deskripsi) VALUES (:nama_merek, :deskripsi)");
         $this->bind('nama_merek', $data['nama_merek']);
+        $this->bind('deskripsi', $data['deskripsi']); // Bind data deskripsi
         return $this->execute();
     }
 
@@ -77,11 +79,14 @@ class Merek_model extends Model {
      * Mengupdate data merek di database
      */
     public function updateMerek($data) {
+        // Tambahkan kolom deskripsi ke query UPDATE
         $this->query("UPDATE " . $this->table . " SET 
-                        nama_merek = :nama_merek
+                        nama_merek = :nama_merek,
+                        deskripsi = :deskripsi
                       WHERE merek_id = :merek_id");
 
         $this->bind('nama_merek', $data['nama_merek']);
+        $this->bind('deskripsi', $data['deskripsi']); // Bind data deskripsi
         $this->bind('merek_id', $data['merek_id'], PDO::PARAM_INT);
 
         return $this->execute();

@@ -45,9 +45,7 @@
            Supplier
         </a>
 
-        <a href="<?php echo BASE_URL; ?>admin/barang" class="tab-nav-action-right" title="Kembali ke Barang">
-            <span>Kembali</span>
-        </a>
+       
     </div>
 
     <div class="table-toolbar">
@@ -58,13 +56,15 @@
         </div>
 
         <div class="toolbar-actions">
-            <button type="button" id="btnBulkDeleteTab" class="btn btn-danger btn-sm" style="display: none; padding: 8px 15px;">
+            
+            <button type="button" id="btnBulkDeleteTab" class="btn btn-brand-dark btn-sm" style="display: none; padding: 8px 15px;">
                 <i class="ph ph-trash"></i> Hapus Terpilih
             </button>
             
-            <a href="<?php echo BASE_URL; ?>admin/addKategori" id="btnMasterAdd" class="btn btn-primary btn-sm" style="padding: 8px 20px;">
+            <a href="<?php echo BASE_URL; ?>admin/addKategori" id="btnMasterAdd" class="btn btn-brand-dark btn-sm" style="padding: 8px 20px;">
                 <i class="ph ph-plus"></i> Tambah Data
             </a>
+            
         </div>
     </div>
 
@@ -207,12 +207,56 @@
                          <?php if(empty($data['status'])): ?>
                             <tr><td colspan="5" style="text-align:center; color:#999;">Belum ada data status.</td></tr>
                         <?php else: ?>
-                            <?php $no = 1; foreach ($data['status'] as $row) : ?>
+                            <?php $no = 1; foreach ($data['status'] as $row) : 
+                                // --- LOGIKA WARNA LABEL OTOMATIS ---
+                                $nama = strtolower($row['nama_status']);
+                                
+                                // Default (Abu-abu - Netral)
+                                $bg = '#f1f5f9'; 
+                                $color = '#475569'; 
+                                $border = '#e2e8f0';
+
+                                // 1. Hijau (Positif: Tersedia, Baik, Aman)
+                                if (strpos($nama, 'tersedia') !== false || strpos($nama, 'baik') !== false || strpos($nama, 'aman') !== false) {
+                                    $bg = '#dcfce7'; 
+                                    $color = '#166534'; 
+                                    $border = '#bbf7d0';
+                                }
+                                // 2. Merah (Negatif: Rusak, Hilang, Reject)
+                                elseif (strpos($nama, 'rusak') !== false || strpos($nama, 'hilang') !== false || strpos($nama, 'reject') !== false) {
+                                    $bg = '#fee2e2'; 
+                                    $color = '#991b1b'; 
+                                    $border = '#fecaca';
+                                }
+                                // 3. Oranye/Kuning (Warning: Kadaluwarsa, Expired, Menipis)
+                                elseif (strpos($nama, 'kadaluwarsa') !== false || strpos($nama, 'expired') !== false || strpos($nama, 'menipis') !== false) {
+                                    $bg = '#fff7ed'; 
+                                    $color = '#c2410c'; 
+                                    $border = '#ffedd5';
+                                }
+                                // 4. Biru (Info: Karantina, Pending, Proses)
+                                elseif (strpos($nama, 'karantina') !== false || strpos($nama, 'pending') !== false || strpos($nama, 'hold') !== false) {
+                                    $bg = '#e0f2fe'; 
+                                    $color = '#075985'; 
+                                    $border = '#bae6fd';
+                                }
+                            ?>
                             <tr>
                                 <td style="text-align:center;"><input type="checkbox" class="row-checkbox-tab" value="<?php echo $row['status_id']; ?>" style="transform: scale(1.2);"></td>
                                 <td><?php echo $no++; ?></td>
                                 <td class="searchable">
-                                    <span style="padding:4px 8px; background:#f1f5f9; border-radius:4px; font-weight:bold; font-size:0.9em;">
+                                    <span style="
+                                        padding: 5px 10px; 
+                                        background: <?php echo $bg; ?>; 
+                                        color: <?php echo $color; ?>; 
+                                        border: 1px solid <?php echo $border; ?>;
+                                        border-radius: 20px; 
+                                        font-weight: 700; 
+                                        font-size: 0.85rem;
+                                        display: inline-block;
+                                        min-width: 80px;
+                                        text-align: center;
+                                    ">
                                         <?php echo htmlspecialchars($row['nama_status']); ?>
                                     </span>
                                 </td>
@@ -305,8 +349,8 @@
                                 <td class="searchable"><?php echo htmlspecialchars($row['telepon']); ?></td>
                                 <td>
                                     <div class="action-buttons">
-                                        <a href="<?php echo BASE_URL; ?>admin/editSupplier/<?php echo $row['supplier_id']; ?>" class="btn-icon edit"><i class="ph ph-pencil-simple"></i></a>
-                                        <button class="btn-icon delete btn-delete" data-url="<?php echo BASE_URL; ?>admin/deleteSupplier/<?php echo $row['supplier_id']; ?>"><i class="ph ph-trash"></i></button>
+                                        <a href="<?php echo BASE_URL; ?>admin/editSupplier/<?php echo $row['supplier_id']; ?>" class="btn-icon edit btn-edit-item" title="Edit"><i class="ph ph-pencil-simple"></i></a>
+                                        <button class="btn-icon delete btn-delete" data-url="<?php echo BASE_URL; ?>admin/deleteSupplier/<?php echo $row['supplier_id']; ?>" title="Hapus"><i class="ph ph-trash"></i></button>
                                     </div>
                                 </td>
                             </tr>
@@ -315,11 +359,11 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-        <div class="pagination-container custom-pagination"></div>
-    </div>
+            <div class="pagination-container custom-pagination"></div>
+        </div> </div>
 </main>
-
+    
 <?php
     require_once APPROOT . '/views/templates/footer.php';
+    
 ?>

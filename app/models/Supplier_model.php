@@ -70,13 +70,13 @@ class Supplier_model extends Model {
     public function createSupplier($data) {
         $this->query("INSERT INTO " . $this->table . " (nama_supplier, kontak_person, telepon, email, alamat) 
                       VALUES (:nama_supplier, :kontak_person, :telepon, :email, :alamat)");
-
+        
         $this->bind('nama_supplier', $data['nama_supplier']);
         $this->bind('kontak_person', $data['kontak_person']);
         $this->bind('telepon', $data['telepon']);
-        $this->bind('email', $data['email']);
+        $this->bind('email', $data['email']); // Bind Email
         $this->bind('alamat', $data['alamat']);
-
+        
         return $this->execute();
     }
 
@@ -85,20 +85,20 @@ class Supplier_model extends Model {
      */
     public function updateSupplier($data) {
         $this->query("UPDATE " . $this->table . " SET 
-                        nama_supplier = :nama_supplier, 
-                        kontak_person = :kontak_person, 
-                        telepon = :telepon, 
-                        email = :email, 
-                        alamat = :alamat 
+                        nama_supplier = :nama_supplier,
+                        kontak_person = :kontak_person,
+                        telepon = :telepon,
+                        email = :email,
+                        alamat = :alamat
                       WHERE supplier_id = :supplier_id");
 
         $this->bind('nama_supplier', $data['nama_supplier']);
         $this->bind('kontak_person', $data['kontak_person']);
         $this->bind('telepon', $data['telepon']);
-        $this->bind('email', $data['email']);
+        $this->bind('email', $data['email']); // Bind Email
         $this->bind('alamat', $data['alamat']);
-        $this->bind('supplier_id', $data['supplier_id'], PDO::PARAM_INT);
-
+        $this->bind('supplier_id', $data['supplier_id']);
+        
         return $this->execute();
     }
 

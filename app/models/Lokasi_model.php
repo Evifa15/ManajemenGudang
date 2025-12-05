@@ -68,15 +68,16 @@ class Lokasi_model extends Model {
      * Menyimpan data lokasi baru ke database
      */
     public function createLokasi($data) {
-        $this->query("INSERT INTO " . $this->table . " (kode_lokasi, nama_rak, zona, deskripsi) 
-                      VALUES (:kode_lokasi, :nama_rak, :zona, :deskripsi)"); // PERBAIKAN: ->
-
-        $this->bind('kode_lokasi', $data['kode_lokasi']); // PERBAIKAN: ->
-        $this->bind('nama_rak', $data['nama_rak']); // PERBAIKAN: ->
-        $this->bind('zona', $data['zona']); // PERBAIKAN: ->
-        $this->bind('deskripsi', $data['deskripsi']); // PERBAIKAN: ->
-
-        return $this->execute(); // PERBAIKAN: ->
+        $this->query("INSERT INTO " . $this->table . " 
+                      (kode_lokasi, nama_rak, zona, deskripsi) 
+                      VALUES (:kode_lokasi, :nama_rak, :zona, :deskripsi)");
+        
+        $this->bind('kode_lokasi', $data['kode_lokasi']);
+        $this->bind('nama_rak', $data['nama_rak']);
+        $this->bind('zona', $data['zona']);
+        $this->bind('deskripsi', $data['deskripsi']);
+        
+        return $this->execute();
     }
 
     /**
@@ -84,19 +85,27 @@ class Lokasi_model extends Model {
      */
     public function updateLokasi($data) {
         $this->query("UPDATE " . $this->table . " SET 
-                        kode_lokasi = :kode_lokasi, 
-                        nama_rak = :nama_rak, 
-                        zona = :zona, 
-                        deskripsi = :deskripsi 
-                      WHERE lokasi_id = :lokasi_id"); // PERBAIKAN: ->
+                        kode_lokasi = :kode_lokasi,
+                        nama_rak = :nama_rak,
+                        zona = :zona,
+                        deskripsi = :deskripsi
+                      WHERE lokasi_id = :lokasi_id");
 
-        $this->bind('kode_lokasi', $data['kode_lokasi']); // PERBAIKAN: ->
-        $this->bind('nama_rak', $data['nama_rak']); // PERBAIKAN: ->
-        $this->bind('zona', $data['zona']); // PERBAIKAN: ->
-        $this->bind('deskripsi', $data['deskripsi']); // PERBAIKAN: ->
-        $this->bind('lokasi_id', $data['lokasi_id'], PDO::PARAM_INT); // PERBAIKAN: ->
+        $this->bind('kode_lokasi', $data['kode_lokasi']);
+        $this->bind('nama_rak', $data['nama_rak']);
+        $this->bind('zona', $data['zona']);
+        $this->bind('deskripsi', $data['deskripsi']);
+        $this->bind('lokasi_id', $data['lokasi_id']);
+        
+        return $this->execute();
+    }
 
-        return $this->execute(); // PERBAIKAN: ->
+    // Tambahan: Fungsi Cek Kode Unik (biar tidak duplikat)
+    public function checkKodeExists($kode) {
+        $this->query("SELECT lokasi_id FROM " . $this->table . " WHERE kode_lokasi = :kode");
+        $this->bind('kode', $kode);
+        $this->execute();
+        return $this->rowCount() > 0;
     }
 
     /**

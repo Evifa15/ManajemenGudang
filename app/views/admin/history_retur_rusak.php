@@ -75,6 +75,7 @@
     </div>
 
     <div class="pagination-container" id="paginationContainerRetur">
+        <span class="pagination-info">Menampilkan Halaman <?php echo $data['currentPage']; ?> dari <?php echo $data['totalPages']; ?></span>
         <nav>
             <ul class="pagination">
                 <?php

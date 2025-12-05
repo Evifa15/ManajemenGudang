@@ -15,6 +15,21 @@
 
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Pastikan icon memiliki dimensi */
+        i.ph {
+            display: inline-block !important;
+            vertical-align: middle !important;
+            line-height: 1 !important;
+            font-weight: normal !important;
+            font-style: normal !important;
+        }
+        /* Perbaikan khusus untuk tombol bulat */
+        .btn-icon i.ph {
+            font-size: 1.3rem !important;
+        }
+    </style>
 </head>
 <body>
    

@@ -3,66 +3,90 @@
     require_once APPROOT . '/views/templates/sidebar_admin.php';
 
     $isEditMode = isset($data['supplier']) && $data['supplier'] != null;
-    $supplier = $data['supplier']; 
+    $sup = $data['supplier']; 
 ?>
 
 <main class="app-content">
-    
-    <div class="content-header">
-    
-        <h1><?php echo $isEditMode ? 'Edit Supplier' : 'Tambah Supplier Baru'; ?></h1>
-    </div>
-
-    <div class="form-container">
+    <div class="card" style="border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.03); max-width: 800px; margin: 0 auto; padding: 25px;">
+        
         <form action="<?php echo BASE_URL; ?>admin/processSupplier" method="POST">
             
             <?php if ($isEditMode) : ?>
-                <input type="hidden" name="supplier_id" value="<?php echo $supplier['supplier_id']; ?>">
+                <input type="hidden" name="supplier_id" value="<?php echo $sup['supplier_id']; ?>">
             <?php endif; ?>
 
-            <div class="form-group">
-                <label for="nama_supplier">Nama Supplier</label>
-                <input type="text" id="nama_supplier" name="nama_supplier" 
-                       value="<?php echo $isEditMode ? htmlspecialchars($supplier['nama_supplier']) : ''; ?>" 
-                       placeholder="Misal: PT. Sinar Jaya Abadi" required>
+            <div style="margin-bottom: 20px;">
+                <h4 style="color: #152e4d; font-weight: 700; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 8px;">
+                    <i class="ph ph-truck" style="color: #f8c21a; margin-right: 5px;"></i> Informasi Supplier
+                </h4>
+                <p style="color: #64748b; font-size: 0.9rem; margin: 0; line-height: 1.4;">
+                    Data pemasok barang untuk memudahkan pemesanan ulang (Restock).
+                </p>
             </div>
 
-            <div class="form-group">
-                <label for="kontak_person">Kontak Person</label>
-                <input type="text" id="kontak_person" name="kontak_person" 
-                       value="<?php echo $isEditMode ? htmlspecialchars($supplier['kontak_person']) : ''; ?>"
-                       placeholder="Misal: Bp. Budi">
-            </div>
+            <div style="padding: 0 5px;">
+                
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="nama_supplier" style="font-weight: 600; color: #334155; margin-bottom: 6px; display: block;">
+                        Nama Perusahaan / Supplier <span style="color: red;">*</span>
+                    </label>
+                    <input type="text" id="nama_supplier" name="nama_supplier" 
+                           class="form-control"
+                           value="<?php echo $isEditMode ? htmlspecialchars($sup['nama_supplier']) : ''; ?>" 
+                           placeholder="Contoh: PT. Distribusi Sabun Jaya" 
+                           required
+                           style="font-size: 1rem; padding: 10px 15px; font-weight: 600; color: #152e4d; background-color: #f8fafc;">
+                </div>
 
-            <div class="form-group">
-                <label for="telepon">Telepon</label>
-                <input type="text" id="telepon" name="telepon" 
-                       value="<?php echo $isEditMode ? htmlspecialchars($supplier['telepon']) : ''; ?>"
-                       placeholder="Misal: 08123456789">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="kontak_person" style="font-weight: 600; color: #334155; margin-bottom: 6px;">Kontak Person</label>
+                        <input type="text" id="kontak_person" name="kontak_person" class="form-control"
+                               placeholder="Nama Sales / PIC"
+                               value="<?php echo $isEditMode ? htmlspecialchars($sup['kontak_person'] ?? '') : ''; ?>">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="telepon" style="font-weight: 600; color: #334155; margin-bottom: 6px;">No. Telepon / HP</label>
+                        <input type="text" id="telepon" name="telepon" class="form-control"
+                               placeholder="0812..."
+                               value="<?php echo $isEditMode ? htmlspecialchars($sup['telepon'] ?? '') : ''; ?>">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="email" style="font-weight: 600; color: #334155; margin-bottom: 6px;">Email</label>
+                        <input type="email" id="email" name="email" class="form-control"
+                               placeholder="email@supplier.com"
+                               value="<?php echo $isEditMode ? htmlspecialchars($sup['email'] ?? '') : ''; ?>">
+                    </div>
+
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="alamat" style="font-weight: 600; color: #334155; margin-bottom: 6px; display: block;">
+                        Alamat Lengkap
+                    </label>
+                    <textarea id="alamat" name="alamat" rows="3" 
+                              class="form-control"
+                              style="line-height: 1.5; padding: 10px 15px;"
+                              placeholder="Alamat kantor atau gudang supplier..."><?php echo $isEditMode ? htmlspecialchars($sup['alamat'] ?? '') : ''; ?></textarea>
+                </div>
+
             </div>
             
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" 
-                       value="<?php echo $isEditMode ? htmlspecialchars($supplier['email']) : ''; ?>"
-                       placeholder="Misal: info@sinarjaya.com">
-            </div>
-            
-            <div class="form-group">
-                <label for="alamat">Alamat</label>
-                <textarea id="alamat" name="alamat" rows="4"
-                          placeholder="Misal: Jl. Industri No. 10, Jakarta"><?php echo $isEditMode ? htmlspecialchars($supplier['alamat']) : ''; ?></textarea>
-            </div>
-            
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary"><?php echo $isEditMode ? 'Update' : 'Simpan'; ?> Supplier</button>
-                <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-supplier" class="btn btn-danger">Batal</a>
+            <div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px; display: flex; justify-content: flex-end; gap: 15px;">
+                <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-suppliers" class="btn btn-batal-custom" style="padding: 10px 20px;">
+                    Batal
+                </a>
+                <button type="submit" class="btn btn-simpan-custom" style="padding: 10px 25px;">
+                    <i class="ph ph-floppy-disk" style="font-size: 1.2rem;"></i> 
+                    <?php echo $isEditMode ? 'Simpan Perubahan' : 'Simpan Supplier'; ?>
+                </button>
             </div>
 
         </form>
     </div>
 </main>
 
-<?php
-    require_once APPROOT . '/views/templates/footer.php';
-?>
+<?php require_once APPROOT . '/views/templates/footer.php'; ?>

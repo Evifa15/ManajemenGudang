@@ -20,7 +20,7 @@
             
             <li class="<?php echo (in_array($method, ['barang', 'addBarang', 'editBarang', 'detailBarang'])) ? 'active' : ''; ?>">
                 <a href="<?php echo BASE_URL; ?>admin/barang">
-                    <span>Master Data Barang</span>
+                    <span>Data Barang</span>
                 </a>
             </li>
 
@@ -62,7 +62,7 @@
             <?php $isUserActive = (str_contains($method, 'user') || $method == 'rekapAbsensi'); ?>
             <li class="<?php echo $isUserActive ? 'active' : ''; ?>">
                 <a href="javascript:void(0);">
-                    <span>Master Data Pengguna</span>
+                    <span>Data Pengguna</span>
                     <i class="ph ph-caret-down arrow-icon"></i> </a>
                 <ul class="submenu">
                     <li class="<?php echo (str_contains($method, 'user')) ? 'active' : ''; ?>">
@@ -111,21 +111,21 @@
         </div>
         <div class="app-header-actions" style="display: flex; align-items: center; gap: 10px;">
 
-    <?php if (isset($data['back_button'])): ?>
-        <a href="<?php echo $data['back_button']['url']; ?>" 
-        class="btn btn-sm" 
-        style="background-color: #152e4d; color: white; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; font-weight: 600; border-radius: 8px; padding: 8px 15px; height: 38px; border: 1px solid #152e4d; transition: all 0.2s; ">
-            <i class="ph ph-arrow-left" style="font-weight: bold;"></i> 
-            <?php echo $data['back_button']['label']; ?>
-        </a>
-    <?php endif; ?>
+            <?php if (isset($data['back_button'])): ?>
+                <a href="<?php echo $data['back_button']['url']; ?>" 
+                   class="btn btn-sm" 
+                   style="background-color: #152e4d; color: white; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; font-weight: 600; border-radius: 8px; padding: 8px 15px; height: 38px; border: 1px solid #152e4d; transition: all 0.2s;">
+                    <i class="ph ph-arrow-left" style="font-weight: bold;"></i> 
+                    <?php echo $data['back_button']['label']; ?>
+                </a>
+            <?php endif; ?>
 
-    <a href="<?php echo BASE_URL; ?>auth/logout" class="btn btn-outline-danger" 
-       style="border-color: #ffcccc; color: #d63384; background: #fff0f6; border-radius: 8px; padding: 8px 15px; font-weight: 600; height: 38px; display: inline-flex; align-items: center; text-decoration: none;">
-        Logout
-    </a>
+            <a href="<?php echo BASE_URL; ?>auth/logout" class="btn btn-outline-danger" 
+               style="border-color: #ffcccc; color: #d63384; background: #fff0f6; border-radius: 8px; padding: 8px 15px; font-weight: 600; height: 38px; display: inline-flex; align-items: center; text-decoration: none;">
+                Logout
+            </a>
 
-</div>
+        </div>
     </header>
     
     <div class="app-content">

@@ -486,5 +486,83 @@ class Product_model extends Model {
 
         return $prefix . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
     }
+
+    /**
+     * [EXPORT] Mengambil semua data produk lengkap untuk Export (Tanpa Limit)
+     * PERBAIKAN: Menghapus join status_id/lokasi_id langsung ke tabel products
+     */
+    public function getAllProductsNoLimit($search = '', $kategori = '', $merek = '', $status = '', $lokasi = '') {
+        $sql = "SELECT p.*, 
+                       k.nama_kategori, 
+                       m.nama_merek, 
+                       s.nama_satuan, 
+                       
+                       -- Ambil satu contoh lokasi (karena 1 barang bisa di banyak rak)
+                       (SELECT l.kode_lokasi FROM product_stock ps_loc 
+                        JOIN lokasi l ON ps_loc.lokasi_id = l.lokasi_id 
+                        WHERE ps_loc.product_id = p.product_id LIMIT 1) as kode_lokasi,
+
+                       -- Ambil satu contoh status (misal 'Tersedia')
+                       (SELECT sb.nama_status FROM product_stock ps_stat
+                        JOIN status_barang sb ON ps_stat.status_id = sb.status_id
+                        WHERE ps_stat.product_id = p.product_id LIMIT 1) as nama_status,
+                       
+                       -- Hitung total stok fisik
+                       (SELECT COALESCE(SUM(quantity), 0) FROM product_stock WHERE product_id = p.product_id) as stok_total
+
+                FROM " . $this->table . " p
+                LEFT JOIN kategori k ON p.kategori_id = k.kategori_id
+                LEFT JOIN merek m ON p.merek_id = m.merek_id
+                LEFT JOIN satuan s ON p.satuan_id = s.satuan_id
+                
+                -- Join ke tabel stok untuk keperluan FILTERING saja
+                LEFT JOIN product_stock ps_filter ON p.product_id = ps_filter.product_id
+                
+                WHERE 1=1";
+
+        $params = [];
+
+        // 1. Filter Search
+        if (!empty($search)) {
+            $sql .= " AND (p.nama_barang LIKE :search OR p.kode_barang LIKE :search)";
+            $params[':search'] = "%$search%";
+        }
+
+        // 2. Filter Kategori
+        if (!empty($kategori)) {
+            $sql .= " AND p.kategori_id = :kategori";
+            $params[':kategori'] = $kategori;
+        }
+
+        // 3. Filter Merek
+        if (!empty($merek)) {
+            $sql .= " AND p.merek_id = :merek";
+            $params[':merek'] = $merek;
+        }
+
+        // 4. Filter Status (Sekarang cek ke tabel stock, bukan products)
+        if (!empty($status)) {
+            $sql .= " AND ps_filter.status_id = :status";
+            $params[':status'] = $status;
+        }
+
+        // 5. Filter Lokasi (Sekarang cek ke tabel stock, bukan products)
+        if (!empty($lokasi)) {
+            $sql .= " AND ps_filter.lokasi_id = :lokasi";
+            $params[':lokasi'] = $lokasi;
+        }
+
+        // GROUP BY PENTING: Agar jika 1 barang punya banyak stok, tidak muncul double barisnya
+        $sql .= " GROUP BY p.product_id ORDER BY p.nama_barang ASC";
+
+        $this->query($sql);
+        
+        // Bind parameter
+        foreach ($params as $key => $value) {
+            $this->bind($key, $value);
+        }
+
+        return $this->resultSet();
+    }
     
 }

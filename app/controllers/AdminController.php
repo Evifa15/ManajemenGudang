@@ -703,32 +703,35 @@ exit;
 
         $data = [
             'lokasi_id'   => $_POST['lokasi_id'] ?? null,
-            'kode_lokasi' => $_POST['kode_lokasi'],
-            'nama_rak'    => $_POST['nama_rak'],
-            'zona'        => $_POST['zona'],
+            'kode_lokasi' => $_POST['kode_lokasi'], // Baru
+            'nama_rak'    => $_POST['nama_rak'],    // Baru
+            'zona'        => $_POST['zona'],        // Baru
             'deskripsi'   => $_POST['deskripsi']
         ];
 
-        $lokasiModel = $this->model('Lokasi_model'); // PERBAIKAN: ->
+        $lokasiModel = $this->model('Lokasi_model');
 
         try {
             if (!empty($data['lokasi_id'])) {
-                $lokasiModel->updateLokasi($data); // PERBAIKAN: ->
+                // Proses Update
+                $lokasiModel->updateLokasi($data);
                 $_SESSION['flash_message'] = ['text' => 'Data lokasi berhasil di-update.', 'type' => 'success'];
             } else {
-                $lokasiModel->createLokasi($data); // PERBAIKAN: ->
+                // Proses Insert Baru
+                // Cek Kode Unik dulu (Opsional, tapi disarankan)
+                if ($lokasiModel->checkKodeExists($data['kode_lokasi'])) {
+                    throw new Exception("Kode Lokasi sudah digunakan!");
+                }
+                
+                $lokasiModel->createLokasi($data);
                 $_SESSION['flash_message'] = ['text' => 'Lokasi baru berhasil ditambahkan.', 'type' => 'success'];
             }
-        } catch (PDOException $e) {
-            if ($e->errorInfo[1] == 1062) {
-                $_SESSION['flash_message'] = ['text' => 'Gagal! Kode Lokasi "' . $data['kode_lokasi'] . '" sudah ada.', 'type' => 'error'];
-            } else {
-                $_SESSION['flash_message'] = ['text' => 'Gagal memproses data lokasi.', 'type' => 'error'];
-            }
+        } catch (Exception $e) {
+            $_SESSION['flash_message'] = ['text' => 'Gagal: ' . $e->getMessage(), 'type' => 'error'];
         }
 
         header('Location: ' . BASE_URL . 'admin/masterDataConfig#tab-lokasi');
-exit;
+        exit;
     }
 
     /**
@@ -943,7 +946,8 @@ exit;
 
         $data = [
             'merek_id'   => $_POST['merek_id'] ?? null,
-            'nama_merek' => $_POST['nama_merek']
+            'nama_merek' => $_POST['nama_merek'],    
+            'deskripsi'  => $_POST['deskripsi']
         ];
 
         $merekModel = $this->model('Merek_model');
@@ -1064,7 +1068,8 @@ exit;
         $data = [
             'satuan_id'   => $_POST['satuan_id'] ?? null,
             'nama_satuan' => $_POST['nama_satuan'],
-            'singkatan'   => $_POST['singkatan']
+            'singkatan'   => $_POST['singkatan'],
+            'deskripsi'   => $_POST['deskripsi']
         ];
 
         $satuanModel = $this->model('Satuan_model');
@@ -1285,11 +1290,11 @@ exit;
                     $statusBadge = '';
                     
                     if ($stok == 0) {
-                        $statusBadge = '<span style="background:#dc3545; color:white; padding:3px 8px; border-radius:4px; font-size:0.8em;">Habis</span>';
+                        $statusBadge = '<span style="background:#fee2e2; color:#991b1b; padding:4px 10px; border-radius:20px; font-size:0.8rem; font-weight:700; border:1px solid #fecaca;">Habis</span>';
                     } elseif ($stok <= $min) {
-                        $statusBadge = '<span style="background:#ffc107; color:black; padding:3px 8px; border-radius:4px; font-size:0.8em;">Menipis</span>';
+                        $statusBadge = '<span style="background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:20px; font-size:0.8rem; font-weight:700; border:1px solid #fde68a;">Menipis</span>';
                     } else {
-                        $statusBadge = '<span style="background:#28a745; color:white; padding:3px 8px; border-radius:4px; font-size:0.8em;">Aman</span>';
+                        $statusBadge = '<span style="background:#dcfce7; color:#166534; padding:4px 10px; border-radius:20px; font-size:0.8rem; font-weight:700; border:1px solid #bbf7d0;">Aman</span>';
                     }
 
                     // Susun HTML Baris (TR)
@@ -1331,7 +1336,11 @@ exit;
             }
 
             // Kirim JSON ke JS
-            echo json_encode(['html' => $html, 'totalPages' => $totalPages]);
+            echo json_encode([
+                'html' => $html, 
+                'totalPages' => $totalPages, 
+                'currentPage' => $page 
+            ]);
             exit; // Stop agar tidak load view di bawah
         }
 
@@ -1369,14 +1378,24 @@ exit;
     public function addBarang() {
         $data = [
             'judul' => 'Tambah Barang Baru',
-            'kategori' => $this->model('Kategori_model')->getAllKategori(), // PERBAIKAN: ->
-            'merek' => $this->model('Merek_model')->getAllMerek(), // PERBAIKAN: ->
-            'satuan' => $this->model('Satuan_model')->getAllSatuan(), // PERBAIKAN: ->
-            'lokasi' => $this->model('Lokasi_model')->getAllLokasi(), // PERBAIKAN: ->
-            'status' => $this->model('Status_model')->getAllStatus(), // PERBAIKAN: ->
-            'barang' => null
+        
+            'kategori' => $this->model('Kategori_model')->getAllKategori(),
+            'merek'    => $this->model('Merek_model')->getAllMerek(),
+            'satuan'   => $this->model('Satuan_model')->getAllSatuan(),
+            'lokasi'   => $this->model('Lokasi_model')->getAllLokasi(),
+            'status'   => $this->model('Status_model')->getAllStatus(),
+            
+            // Tambahkan Suppliers jika form membutuhkannya (Opsional, hapus jika error)
+            'suppliers' => $this->model('Supplier_model')->getAllSuppliers(),
+            
+            'barang'   => null
         ];
-        $this->view('admin/form_barang', $data); // PERBAIKAN: ->
+
+        // Memuat View secara berurutan agar tampilan utuh
+        $this->view('templates/header', $data);
+        $this->view('templates/sidebar_admin', $data);
+        $this->view('admin/form_barang', $data);
+        $this->view('templates/footer');
     }
 
     /**
@@ -2426,10 +2445,15 @@ public function processCheckOut() {
     |--------------------------------------------------------------------------
     */
     public function masterDataConfig() {
-        // Ambil semua data dari masing-masing model
-        // Kita menggunakan method 'getAll...' yang sudah tersedia di masing-masing model
         $data = [
             'judul'     => 'Konfigurasi Data Master',
+            
+            // [PERBAIKAN] Tambahkan konfigurasi tombol kembali di sini
+            'back_button' => [
+                'url' => BASE_URL . 'admin/barang', 
+                'label' => 'Kembali'
+            ],
+
             'suppliers' => $this->model('Supplier_model')->getAllSuppliers(),
             'lokasi'    => $this->model('Lokasi_model')->getAllLokasi(),
             'kategori'  => $this->model('Kategori_model')->getAllKategori(),
@@ -2438,9 +2462,13 @@ public function processCheckOut() {
             'status'    => $this->model('Status_model')->getAllStatus()
         ];
         
-        // Panggil view baru (yang akan kita buat di langkah B)
+        // [PERBAIKAN] Pastikan memuat struktur lengkap (Header + Sidebar + Footer)
+        $this->view('templates/header', $data);
+        $this->view('templates/sidebar_admin', $data);
         $this->view('admin/master_data_config', $data);
+        $this->view('templates/footer');
     }
+    
     /* |--------------------------------------------------------------------------
     | LOGIKA HAPUS MASAL (BULK DELETE) - UNIVERSAL
     |--------------------------------------------------------------------------
@@ -2598,72 +2626,100 @@ public function processCheckOut() {
      * URL: /admin/exportBarang/csv  ATAU  /admin/exportBarang/excel
      */
     public function exportBarang($type = 'csv') {
-        // 1. Ambil data dari Model
-        $productModel = $this->model('Product_model');
-        $products = $productModel->getAllProductsForExport();
-        $timestamp = date('Y-m-d_H-i');
+        // 1. Ambil Data Filter dari URL (GET)
+        $search   = $_GET['search'] ?? '';
+        $kategori = $_GET['kategori'] ?? '';
+        $merek    = $_GET['merek'] ?? '';
+        $status   = $_GET['status'] ?? '';
+        $lokasi   = $_GET['lokasi'] ?? '';
 
-        // 2. LOGIKA EXCEL (.xls)
+        // Panggil Model
+        $productModel = $this->model('Product_model');
+        
+        // Gunakan fungsi khusus tanpa limit pagination
+        $products = $productModel->getAllProductsNoLimit($search, $kategori, $merek, $status, $lokasi);
+
+        // 2. PEMBERSIHAN BUFFER (Sangat Penting untuk Download)
+        // Ini menghapus semua output HTML/Spasi yang tidak sengaja tercetak sebelumnya
+        if (ob_get_level()) ob_end_clean();
+
+        // 3. Logika Export Berdasarkan Tipe
         if ($type == 'excel') {
-            $filename = "master_barang_{$timestamp}.xls";
+            // --- EXCEL (.xls) ---
+            $filename = "Data_Barang_" . date('Ymd_His') . ".xls";
             
-            // Header agar dibaca sebagai Excel
             header("Content-Type: application/vnd.ms-excel");
             header("Content-Disposition: attachment; filename=\"$filename\"");
             header("Pragma: no-cache");
             header("Expires: 0");
 
-            // Output sebagai Tabel HTML (Excel bisa membacanya)
+            // Cetak Tabel HTML (Excel akan membacanya)
             echo '<table border="1">';
             echo '<thead>
-                    <tr style="background-color: #f2f2f2; font-weight: bold;">
+                    <tr style="background-color:#f0f0f0; font-weight:bold;">
                         <th>Kode Barang</th>
                         <th>Nama Barang</th>
                         <th>Kategori</th>
                         <th>Merek</th>
+                        <th>Stok</th>
                         <th>Satuan</th>
-                        <th>Total Stok</th>
-                        <th>Stok Minimum</th>
-                        <th>Deskripsi</th>
+                        <th>Lokasi</th>
+                        <th>Status</th>
                     </tr>
-                  </thead>';
-            echo '<tbody>';
+                  </thead>
+                  <tbody>';
             
             foreach ($products as $row) {
-                echo '<tr>';
-                echo '<td>' . htmlspecialchars($row['kode_barang']) . '</td>';
-                echo '<td>' . htmlspecialchars($row['nama_barang']) . '</td>';
-                echo '<td>' . htmlspecialchars($row['nama_kategori']) . '</td>';
-                echo '<td>' . htmlspecialchars($row['nama_merek']) . '</td>';
-                echo '<td>' . htmlspecialchars($row['nama_satuan']) . '</td>';
-                echo '<td style="text-align:center;">' . $row['total_stok'] . '</td>';
-                echo '<td style="text-align:center;">' . $row['stok_minimum'] . '</td>';
-                echo '<td>' . htmlspecialchars($row['deskripsi']) . '</td>';
-                echo '</tr>';
+                // Trik tanda kutip satu (') di depan kode agar Excel membacanya sebagai teks (agar angka 0 di depan tidak hilang)
+                echo "<tr>
+                        <td>'{$row['kode_barang']}</td>
+                        <td>{$row['nama_barang']}</td>
+                        <td>{$row['nama_kategori']}</td>
+                        <td>{$row['nama_merek']}</td>
+                        <td>{$row['stok_total']}</td>
+                        <td>{$row['nama_satuan']}</td>
+                        <td>{$row['kode_lokasi']}</td>
+                        <td>{$row['nama_status']}</td>
+                      </tr>";
             }
-            
-            echo '</tbody>';
-            echo '</table>';
+            echo '</tbody></table>';
             exit;
-        } 
-        
-        // 3. LOGIKA CSV (Default)
-        else {
-            $filename = "master_barang_{$timestamp}.csv";
+
+        } elseif ($type == 'pdf') {
+            // --- PDF (HTML View) ---
+            // Tidak perlu ob_clean di sini karena html2pdf butuh output HTML
+            $data = [
+                'title' => 'Laporan Data Barang',
+                'barang' => $products,
+                'tanggal' => date('d F Y')
+            ];
+            $this->view('admin/print_barang_full', $data);
+            exit;
+
+        } else {
+            // --- CSV (Default) ---
+            $filename = "Data_Barang_" . date('Ymd_His') . ".csv";
+
             header('Content-Type: text/csv; charset=utf-8');
             header('Content-Disposition: attachment; filename="' . $filename . '"');
-            
-            $output = fopen('php://output', 'w');
-            
-            // Header Kolom
-            fputcsv($output, ['Kode Barang', 'Nama Barang', 'Kategori', 'Merek', 'Satuan', 'Total Stok', 'Stok Minimum', 'Deskripsi']);
+            header("Pragma: no-cache");
+            header("Expires: 0");
 
-            // Isi Data
+            $output = fopen('php://output', 'w');
+
+            // Header Kolom CSV
+            fputcsv($output, ['Kode Barang', 'Nama Barang', 'Kategori', 'Merek', 'Stok', 'Satuan', 'Lokasi', 'Status']);
+
             foreach ($products as $row) {
                 fputcsv($output, [
-                    $row['kode_barang'], $row['nama_barang'], $row['nama_kategori'],
-                    $row['nama_merek'], $row['nama_satuan'], $row['total_stok'],
-                    $row['stok_minimum'], $row['deskripsi']
+                    $row['kode_barang'],
+                    $row['nama_barang'],
+                    $row['nama_kategori'],
+                    $row['nama_merek'],
+                    $row['stok_total'],
+                    $row['nama_satuan'],
+                    $row['kode_lokasi'],
+                    $row['nama_status']
                 ]);
             }
             fclose($output);
@@ -2735,6 +2791,9 @@ public function processCheckOut() {
     /**
      * [AKSI] Halaman Cetak Label Barcode
      */
+    /**
+     * [AKSI] Halaman Cetak Label Barcode
+     */
     public function cetakLabel($id) {
         $productModel = $this->model('Product_model');
         $product = $productModel->getProductById($id);
@@ -2747,34 +2806,17 @@ public function processCheckOut() {
 
         $data = [
             'judul' => 'Cetak Label Barang',
-            'product' => $product
+            'product' => $product,
+            
+            // --- PERBAIKAN: URL ke Data Barang, Teks cuma "Kembali" ---
+            'back_button' => [
+                'url' => BASE_URL . 'admin/barang', // Tetap ke halaman list barang
+                'label' => 'Kembali'               // Teks tombol jadi singkat
+            ]
+            // ----------------------------------------------------------
         ];
 
-        // Kita buat view khusus yang bersih
         $this->view('admin/print_label', $data);
-    }
-
-    public function detailBarang($id) {
-        $productModel = $this->model('Product_model');
-        // Ambil data lengkap (bisa pakai getAllProductsForExport dan filter, atau buat method baru getFullDetailById)
-        // Biar cepat, kita pakai getProductById, tapi pastikan join-nya lengkap.
-        // (Lebih baik update getProductById di model agar ada nama kategori dll)
-        
-        // SEMENTARA: Kita pakai logic sederhana, ambil product lalu ambil nama kategori terpisah (atau join manual)
-        // SARAN: Update getProductById di model agar melakukan JOIN.
-        
-        $product = $productModel->getProductByIdWithDetails($id); // <-- Buat fungsi ini di Model
-
-        if (!$product) {
-            header('Location: ' . BASE_URL . 'admin/barang');
-            exit;
-        }
-
-        $data = [
-            'judul' => 'Detail Barang',
-            'product' => $product
-        ];
-        $this->view('admin/detail_barang', $data);
     }
 
     /**
@@ -2941,6 +2983,5 @@ public function processCheckOut() {
         fclose($output);
         exit;
     }
-
 
 }
