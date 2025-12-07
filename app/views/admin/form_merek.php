@@ -46,26 +46,46 @@
                         Deskripsi / Keterangan <span style="color: #94a3b8; font-weight: 400;">(Opsional)</span>
                     </label>
                     <textarea id="deskripsi" name="deskripsi" rows="3" 
-          class="form-control"
-          style="line-height: 1.5; padding: 10px 15px;"
-          placeholder="Tambahkan catatan opsional mengenai merek ini..."><?php echo $isEditMode ? htmlspecialchars($mrk['deskripsi'] ?? '') : ''; ?></textarea>
+                    class="form-control"
+                    style="line-height: 1.5; padding: 10px 15px;"
+                    placeholder="Tambahkan catatan opsional mengenai merek ini..."><?php echo $isEditMode ? htmlspecialchars($mrk['deskripsi'] ?? '') : ''; ?></textarea>
                 </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="status" style="font-weight: 600; color: #334155; margin-bottom: 6px; display: block;">
+                            Status <span style="color: red;">*</span>
+                        </label>
+                        <div style="position: relative;">
+                            <select name="status" id="status" class="form-control" required
+                                    style="font-size: 1rem; padding: 10px 15px; font-weight: 500; appearance: none;">
+                                
+                                <option value="Aktif" <?php echo ($isEditMode && $mrk['status'] == 'Aktif') ? 'selected' : ''; ?>>
+                                    Aktif (Bisa Dipilih)
+                                </option>
+                                
+                                <option value="Non-Aktif" <?php echo ($isEditMode && $mrk['status'] == 'Non-Aktif') ? 'selected' : ''; ?>>
+                                    Non-Aktif (Disembunyikan)
+                                </option>
 
-            </div>
-            
-            <div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px; display: flex; justify-content: flex-end; gap: 15px;">
-                
-                <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-merek" class="btn btn-batal-custom" style="padding: 10px 20px;">
-                    Batal
-                </a>
-                
-                <button type="submit" class="btn btn-simpan-custom" style="padding: 10px 25px;">
-                    <i class="ph ph-floppy-disk" style="font-size: 1.2rem;"></i> 
-                    <?php echo $isEditMode ? 'Simpan Perubahan' : 'Simpan Merek'; ?>
-                </button>
+                            </select>
+                            <i class="ph ph-caret-down" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #64748b; pointer-events: none;"></i>
+                        </div>
+                        <small style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px; display: block;">
+                            *Jika Non-Aktif, merek ini tidak akan muncul saat menambah barang baru.
+                        </small>
+                    </div>
 
-            </div>
-
+                    </div>
+                        <div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px; display: flex; justify-content: flex-end; gap: 15px;">
+                            
+                            <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-merek" class="btn-batal-custom">
+                                Batal
+                            </a>
+                            
+                            <button type="submit" class="btn-simpan-custom">
+                                <i class="ph ph-floppy-disk" style="font-size: 1.2rem;"></i> 
+                                <?php echo $isEditMode ? 'Simpan Perubahan' : 'Simpan Kategori'; ?>
+                            </button>
+                        </div>
         </form>
     </div>
 </main>

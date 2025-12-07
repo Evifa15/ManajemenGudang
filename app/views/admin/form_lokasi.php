@@ -73,13 +73,16 @@
             </div>
             
             <div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px; display: flex; justify-content: flex-end; gap: 15px;">
-                <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-lokasi" class="btn btn-batal-custom" style="padding: 10px 20px;">
+                
+                <a href="<?php echo BASE_URL; ?>admin/masterDataConfig#tab-lokasi" class="btn-batal-custom">
                     Batal
                 </a>
-                <button type="submit" class="btn btn-simpan-custom" style="padding: 10px 25px;">
+                
+                <button type="submit" class="btn-simpan-custom">
                     <i class="ph ph-floppy-disk" style="font-size: 1.2rem;"></i> 
-                    <?php echo $isEditMode ? 'Simpan Perubahan' : 'Simpan Lokasi'; ?>
+                    <?php echo $isEditMode ? 'Simpan Perubahan' : 'Simpan Kategori'; ?>
                 </button>
+
             </div>
 
         </form>

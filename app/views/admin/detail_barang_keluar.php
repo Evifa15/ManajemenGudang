@@ -25,7 +25,7 @@
                     </div>
 
                     <div class="info-block">
-                        <label class="info-label">WAKTU INPUT</label>
+                        <label class="info-label">WAKTU KELUAR</label>
                         <div class="info-value-main">
                             <?php echo date('d F Y', strtotime($d['created_at'])); ?> 
                         </div>
@@ -35,7 +35,7 @@
                     </div>
 
                     <div class="info-block">
-                        <label class="info-label">DIINPUT OLEH</label>
+                        <label class="info-label">DIAMBIL OLEH</label>
                         <div class="staff-info-item">
                             <div class="staff-initial-badge">
                                 <?php echo strtoupper(substr($d['staff_nama'], 0, 1)); ?>
@@ -50,10 +50,30 @@
                     </div>
 
                     <div class="info-block" style="margin-bottom: 0;">
-                        <label class="info-label">SUPPLIER / SUMBER</label>
-                        <div class="info-value-main" style="display: flex; align-items: center; gap: 8px;">
-                            <i class="ph ph-truck" style="color: #64748b;"></i>
-                            <?php echo !empty($d['nama_supplier']) ? htmlspecialchars($d['nama_supplier']) : '-'; ?>
+                        <label class="info-label">KETERANGAN / TUJUAN</label>
+                        <div class="keterangan-box">
+                            <i class="ph ph-info" style="font-size: 1.2rem; margin-top: 2px;"></i>
+                            <div>"<?php echo htmlspecialchars($d['keterangan']); ?>"</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 30px;">
+                        <label class="info-label">BUKTI FILE (SJP / SERAH TERIMA)</label>
+                        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                            <?php if (!empty($d['bukti_foto_array'])): ?>
+                                <?php foreach($d['bukti_foto_array'] as $file): 
+                                    $filePath = BASE_URL . 'uploads/bukti_transaksi/' . $file;
+                                    $isImage = in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp']);
+                                ?>
+                                <a href="<?php echo $filePath; ?>" target="_blank" 
+                                   class="btn btn-sm" 
+                                   style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; font-weight: 600;">
+                                    <i class="ph ph-file-<?php echo $isImage ? 'image' : 'pdf'; ?>"></i> Lihat File
+                                </a>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <span style="color: #94a3b8; font-style: italic;">Tidak ada bukti file diupload.</span>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -64,7 +84,7 @@
         <div class="col-right" style="flex: 2; min-width: 400px;">
             <div class="card detail-card-base">
                 <div class="detail-card-header">
-                    <i class="ph ph-package" style="color: #152e4d; font-size: 1.2rem;"></i> Detail Barang Masuk
+                    <i class="ph ph-package" style="color: #152e4d; font-size: 1.2rem;"></i> Detail Barang Keluar
                 </div>
                 <div class="detail-card-body">
                     
@@ -95,12 +115,12 @@
                             </div>
                         </div>
                         
-                        <div class="qty-large-wrapper">
-                            <div class="qty-label">JUMLAH MASUK</div>
-                            <div class="qty-value">
-                                +<?php echo $d['jumlah']; ?>
+                        <div class="qty-large-wrapper" style="background: #fef2f2; border-color: #fecaca;">
+                            <div class="qty-label" style="color: #dc2626;">JUMLAH KELUAR</div>
+                            <div class="qty-value" style="color: #ef4444;">
+                                -<?php echo $d['jumlah']; ?>
                             </div>
-                            <div class="info-value-sub" style="color: #059669; font-weight: 600; margin-top: 5px;"><?php echo htmlspecialchars($d['nama_satuan']); ?></div>
+                            <div class="info-value-sub" style="color: #ef4444; font-weight: 600; margin-top: 5px;"><?php echo htmlspecialchars($d['nama_satuan']); ?></div>
                         </div>
                     </div>
 
@@ -136,17 +156,6 @@
                         </div>
 
                     </div>
-
-                    <?php if(!empty($d['keterangan'])): ?>
-                    <div style="margin-top: 30px;">
-                        <label class="info-label">KETERANGAN / CATATAN</label>
-                        <div class="keterangan-box">
-                            <i class="ph ph-info" style="font-size: 1.2rem; margin-top: 2px;"></i>
-                            <div>"<?php echo htmlspecialchars($d['keterangan']); ?>"</div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
                 </div>
             </div>
         </div>

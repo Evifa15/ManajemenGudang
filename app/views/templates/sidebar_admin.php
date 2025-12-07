@@ -26,7 +26,7 @@
 
             <?php $isTransaksiActive = in_array($method, ['riwayatBarangMasuk', 'detailBarangMasuk', 'riwayatBarangKeluar', 'riwayatReturRusak', 'riwayatPeminjaman']); ?>
             <li class="<?php echo $isTransaksiActive ? 'active' : ''; ?>">
-                <a href="javascript:void(0);"> <span>Menu Transaksi</span>
+                <a href="javascript:void(0);"> <span>Transaksi Barang</span>
                     <i class="ph ph-caret-down arrow-icon"></i> </a>
                 <ul class="submenu">
                     <li class="<?php echo ($method == 'riwayatBarangMasuk' || $method == 'detailBarangMasuk') ? 'active' : ''; ?>">

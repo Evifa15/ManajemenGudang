@@ -68,14 +68,17 @@ class Supplier_model extends Model {
      * Menyimpan data supplier baru ke database
      */
     public function createSupplier($data) {
-        $this->query("INSERT INTO " . $this->table . " (nama_supplier, kontak_person, telepon, email, alamat) 
-                      VALUES (:nama_supplier, :kontak_person, :telepon, :email, :alamat)");
+        $this->query("INSERT INTO suppliers (nama_supplier, kontak_person, telepon, email, alamat, bank, no_rekening, status) 
+                  VALUES (:nama, :kontak, :telp, :email, :alamat, :bank, :norek, :status)");
         
         $this->bind('nama_supplier', $data['nama_supplier']);
         $this->bind('kontak_person', $data['kontak_person']);
         $this->bind('telepon', $data['telepon']);
-        $this->bind('email', $data['email']); // Bind Email
+        $this->bind('email', $data['email']); 
         $this->bind('alamat', $data['alamat']);
+        $this->bind('bank', $data['bank']);
+        $this->bind('norek', $data['no_rekening']);
+        $this->bind('status', $data['status']);
         
         return $this->execute();
     }

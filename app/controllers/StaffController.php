@@ -2,10 +2,24 @@
 
 class StaffController extends Controller {
     public function __construct() {
+        // Cek apakah permintaan ini adalah permintaan AJAX (agar tidak redirect ke HTML)
+        $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        
         if (!isset($_SESSION['is_logged_in'])) {
-            header('Location: ' . BASE_URL . 'auth/index');
-            exit;
+            if ($isAjax) {
+                // 🔥 FIX: Kirim status 401 dan pesan JSON yang bersih, JANGAN REDIRECT
+                header('Content-Type: application/json');
+                http_response_code(401); 
+                echo json_encode(['error' => 'Unauthorized: Session Expired', 'redirect' => BASE_URL . 'auth/index']);
+                exit;
+            } else {
+                // Jika bukan AJAX, lakukan redirect normal (untuk akses langsung URL)
+                header('Location: ' . BASE_URL . 'auth/index');
+                exit;
+            }
         }
+        
+        // Cek Role (Jika sesi ada, tapi bukan Staff)
         if ($_SESSION['role'] != 'staff') {
             $_SESSION['flash_message'] = ['text' => 'Anda tidak memiliki hak akses.', 'type' => 'error'];
             header('Location: ' . BASE_URL . 'auth/index');
@@ -21,17 +35,15 @@ class StaffController extends Controller {
     }
     
     public function dashboard() {
-    // Panggil model absensi
-    $absensiModel = $this->model('Absensi_model');
-    $todayAttendance = $absensiModel->getTodayAttendance($_SESSION['user_id']);
+        $absensiModel = $this->model('Absensi_model');
+        $todayAttendance = $absensiModel->getTodayAttendance($_SESSION['user_id']);
 
-    $data = [
-        'judul' => 'Dashboard Staff',
-        'today_attendance' => $todayAttendance // <-- Kirim data absensi ke view
-        // (Kita bisa tambahkan widget notifikasi peminjaman/opname di sini nanti)
-    ];
-    $this->view('staff/dashboard', $data);
-}
+        $data = [
+            'judul' => 'Dashboard Staff',
+            'today_attendance' => $todayAttendance 
+        ];
+        $this->view('staff/dashboard', $data);
+    }
 
     /* --- MEMPROSES INPUT TIDAK HADIR (SAKIT/IZIN) --- */
     public function processAbsenTidakHadir() {
@@ -95,17 +107,14 @@ class StaffController extends Controller {
     /**
      * Menampilkan halaman form input barang masuk
      */
-    public function barangMasuk() {
-        
-        // Kita butuh data dari 4 model untuk mengisi dropdown
-        $data = [
-            'judul' => 'Form Barang Masuk',
-            // Kita gunakan method 'getAll' yang sudah kita buat
-            'products' => $this->model('Product_model')->getAllProductsList(),
-            'suppliers' => $this->model('Supplier_model')->getAllSuppliers(),
-            'lokasi' => $this->model('Lokasi_model')->getAllLokasi(),
-            'status' => $this->model('Status_model')->getAllStatus()
-        ];
+   public function barangMasuk()
+    {
+        $data['judul'] = 'Barang Masuk';
+        $data['products'] = $this->model('Product_model')->getAllProductsList(); 
+        $data['suppliers'] = $this->model('Supplier_model')->getAllSuppliers();
+        $data['lokasi'] = $this->model('Lokasi_model')->getAllLokasi();
+        $data['status'] = $this->model('Status_model')->getAllStatus();
+        $data['satuan'] = $this->model('Satuan_model')->getAllSatuan(); 
         
         $this->view('staff/form_barang_masuk', $data);
     }
@@ -120,7 +129,6 @@ class StaffController extends Controller {
         }
 
         // --- 1. Validasi Wajib Diisi (Server Side) ---
-        // Kita pastikan Lot, Tgl Produksi, dan Expired Date terisi
         if (empty($_POST['lot_number']) || empty($_POST['production_date']) || empty($_POST['exp_date'])) {
             $_SESSION['flash_message'] = ['text' => 'Gagal: Nomor Batch, Tanggal Produksi, dan Expired Date WAJIB diisi!', 'type' => 'error'];
             header('Location: ' . BASE_URL . 'staff/barangMasuk');
@@ -130,34 +138,27 @@ class StaffController extends Controller {
         // --- 2. Penanganan File Upload (MULTI-FILE) ---
         $uploadedFiles = [];
         
-        // Cek apakah ada file yang diupload dan tidak error
         if (isset($_FILES['bukti_foto']) && !empty($_FILES['bukti_foto']['name'][0])) {
             $files = $_FILES['bukti_foto'];
-            $count = count($files['name']); // Hitung jumlah file yang diupload
+            $count = count($files['name']); 
 
             for ($i = 0; $i < $count; $i++) {
-                // Cek error per file
                 if ($files['error'][$i] == UPLOAD_ERR_OK) {
                     $ext = strtolower(pathinfo($files['name'][$i], PATHINFO_EXTENSION));
                     $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
 
-                    // Validasi Tipe dan Ukuran (Max 5MB per file)
                     if (in_array($ext, $allowed) && $files['size'][$i] < 5000000) {
-                        // Buat nama unik: bukti_[timestamp]_[index].[ext]
                         $newName = "bukti_" . time() . "_{$i}." . $ext;
                         $dest = APPROOT . '/../public/uploads/bukti_transaksi/' . $newName;
                         
-                        // Pindahkan file
                         if (move_uploaded_file($files['tmp_name'][$i], $dest)) {
-                            $uploadedFiles[] = $newName; // Masukkan nama file sukses ke array
+                            $uploadedFiles[] = $newName; 
                         }
                     }
                 }
             }
         }
 
-        // Ubah array nama file menjadi format JSON (String) agar bisa masuk ke kolom TEXT di database
-        // Jika tidak ada file, biarkan null
         $buktiFotoJSON = !empty($uploadedFiles) ? json_encode($uploadedFiles) : null;
 
         // --- 3. Kumpulkan Data ---
@@ -168,11 +169,11 @@ class StaffController extends Controller {
             'supplier_id'     => $_POST['supplier_id'],
             'lokasi_id'       => $_POST['lokasi_id'],
             'status_id'       => $_POST['status_id'],
-            'lot_number'      => trim($_POST['lot_number']),     // Pastikan spasi hilang
+            'lot_number'      => trim($_POST['lot_number']),     
             'production_date' => $_POST['production_date'],
             'exp_date'        => $_POST['exp_date'],
             'keterangan'      => $_POST['keterangan'],
-            'bukti_foto'      => $buktiFotoJSON // <--- Simpan sebagai JSON String
+            'bukti_foto'      => $buktiFotoJSON 
         ];
 
         // --- 4. Kirim ke Model ---
@@ -195,32 +196,49 @@ class StaffController extends Controller {
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Menampilkan halaman form input barang keluar
-     */
     public function barangKeluar() {
-        $data = [
-            'judul' => 'Form Barang Keluar',
-            // Hanya ambil daftar produk untuk dropdown awal
-            'products' => $this->model('Product_model')->getAllProductsList()
-        ];
-        
-        $this->view('staff/form_barang_keluar', $data);
-    }
+    $data['judul'] = 'Input Barang Keluar';
+    $data['active_menu'] = 'barang_keluar';
+    
+    $data['products'] = $this->model('Product_model')->getAllProductsList();
+    $data['satuan'] = $this->model('Satuan_model')->getAllSatuan(); 
+
+    $this->view('staff/form_barang_keluar', $data);
+}
 
     /**
      * [AJAX] Mengambil info stok tersedia untuk satu produk.
-     * Dipanggil oleh JavaScript di form barang keluar.
      * @param int $productId
      */
     public function getStockInfo($productId) {
-        // Ini adalah endpoint API, jadi kita akan kirim JSON
+        // 🔥 FIX 1: Pindahkan header ke awal dan gunakan OB untuk menangkap error
         header('Content-Type: application/json');
         
-        $productModel = $this->model('Product_model');
-        $stockData = $productModel->getAvailableStockForProduct($productId);
+        ob_start(); // Mulai tangkap output
         
-        // Kirim data sebagai JSON
+        try {
+            $productModel = $this->model('Product_model');
+            // Pastikan method ini sudah menggunakan query yang dilonggarkan
+            $stockData = $productModel->getAvailableStockForProduct($productId);
+        } catch (\Throwable $th) {
+            // Tangkap semua error PHP (Fatal/Warning) yang mungkin terjadi di Model
+            $stockData = []; // Default data kosong
+            $errorThrown = true;
+            $debugMessage = $th->getMessage();
+        }
+
+        // Bersihkan buffer dari error/warning yang mungkin muncul di Model
+        $output = ob_get_clean();
+        
+        if (!empty($output) || (isset($errorThrown) && $errorThrown)) {
+             // Jika ada output non-JSON (error), kirim response 500 dan pesan debug
+             http_response_code(500); 
+             $errorMessage = isset($debugMessage) ? $debugMessage : 'Output Corrupted (Warning/Notice)';
+             echo json_encode(['error' => 'AJAX Output Corrupted', 'debug_message' => $errorMessage, 'raw_output' => substr($output, 0, 100)]);
+             exit;
+        }
+
+        // Kirim data sebagai JSON yang bersih
         echo json_encode($stockData);
         exit; // Hentikan eksekusi skrip
     }
@@ -234,15 +252,16 @@ class StaffController extends Controller {
             exit;
         }
 
-        // 1. Kumpulkan Data Form
+        // 1. Kumpulkan Data Form (UPDATE DI SINI)
         $data = [
             'product_id'   => $_POST['product_id'],
-            'stock_id'     => $_POST['stock_id'], // Ini adalah ID stok spesifik (lot/lokasi)
+            'stock_id'     => $_POST['stock_id'], 
             'jumlah'       => (int)$_POST['jumlah'],
+            'satuan_id'    => $_POST['satuan_id'],
             'keterangan'   => $_POST['keterangan'],
-            'user_id'      => $_SESSION['user_id'] // ID Staff
+            'user_id'      => $_SESSION['user_id']
         ];
-
+        
         // 2. Validasi Sederhana
         if (empty($data['stock_id']) || $data['jumlah'] <= 0) {
             $_SESSION['flash_message'] = ['text' => 'Gagal: Harap pilih barang dan lot/lokasi yang valid, dan masukkan jumlah > 0.', 'type' => 'error'];
@@ -257,7 +276,6 @@ class StaffController extends Controller {
             $transactionModel->addBarangKeluar($data);
             $_SESSION['flash_message'] = ['text' => 'Barang keluar berhasil dicatat.', 'type' => 'success'];
         } catch (Exception $e) {
-            // Tangkap pesan error dari Model (misal: "Stok tidak mencukupi!")
             $_SESSION['flash_message'] = ['text' => 'Gagal: ' . $e->getMessage(), 'type' => 'error'];
         }
 
@@ -274,14 +292,11 @@ class StaffController extends Controller {
      * Menampilkan halaman form input retur/rusak
      */
     public function returBarang() {
-        // Ambil data untuk dropdown
         $statusModel = $this->model('Status_model');
         
         $data = [
             'judul' => 'Form Retur/Rusak',
-            // Ambil daftar produk
             'products' => $this->model('Product_model')->getAllProductsList(),
-            // Ambil SEMUA status (Tersedia, Rusak, Karantina, dll)
             'status' => $statusModel->getAllStatus()
         ];
         
@@ -300,12 +315,12 @@ class StaffController extends Controller {
         // 1. Kumpulkan Data Form
         $data = [
             'product_id'        => $_POST['product_id'],
-            'stock_id_asal'     => $_POST['stock_id'], // ID stok 'Tersedia' yang dipilih
+            'stock_id_asal'     => $_POST['stock_id'], 
             'jumlah'            => (int)$_POST['jumlah'],
-            'status_id_tujuan'  => $_POST['status_id_tujuan'], // ID status baru (misal 'Rusak')
-            'keterangan'        => $_POST['keterangan'], // Keterangan/Sumber kerusakan
+            'status_id_tujuan'  => $_POST['status_id_tujuan'], 
+            'keterangan'        => $_POST['keterangan'], 
             'exp_date'          => $_POST['exp_date'] ?? null,
-            'user_id'           => $_SESSION['user_id'] // ID Staff
+            'user_id'           => $_SESSION['user_id'] 
         ];
 
         // 2. Validasi Sederhana
@@ -322,7 +337,6 @@ class StaffController extends Controller {
             $transactionModel->addBarangRetur($data);
             $_SESSION['flash_message'] = ['text' => 'Laporan barang rusak/retur berhasil dicatat.', 'type' => 'success'];
         } catch (Exception $e) {
-            // Tangkap pesan error dari Model (misal: "Stok tidak mencukupi!")
             $_SESSION['flash_message'] = ['text' => 'Gagal: ' . $e->getMessage(), 'type' => 'error'];
         }
 
@@ -341,7 +355,6 @@ class StaffController extends Controller {
     public function manajemenPeminjaman() {
         $loanModel = $this->model('Loan_model');
         
-        // Ambil data untuk setiap tab
         $data = [
             'judul' => 'Manajemen Peminjaman',
             'permintaan_baru' => $loanModel->getPeminjamanByStatus(['Diajukan']),
@@ -449,21 +462,17 @@ class StaffController extends Controller {
             $data['isOpnameActive'] = true;
             $data['activePeriod'] = $activePeriod;
 
-            // Jika ada Task ID di URL -> Coba masuk WORKSPACE
             if ($taskId) {
                 $task = $opnameModel->getTaskById($taskId);
                 
-                // Validasi: Tugas harus ada, milik user ini, dan statusnya In Progress
                 if ($task && $task['assigned_to_user_id'] == $_SESSION['user_id'] && $task['status_task'] == 'In Progress') {
                     
                     $data['viewState'] = 'workspace';
                     $data['currentTask'] = $task;
                     
-                    // Ambil produk kategori ini
                     $productModel = $this->model('Product_model');
                     $data['products'] = $productModel->getAllProductsList($task['kategori_id']);
                     
-                    // [BARU] Ambil Riwayat Inputan Staff untuk Kategori ini (Checklist)
                     $data['myEntries'] = $opnameModel->getMyEntriesByCategory(
                         $activePeriod['period_id'], 
                         $_SESSION['user_id'], 
@@ -471,20 +480,16 @@ class StaffController extends Controller {
                     );
                 
                 } else {
-                    // Jika tidak valid (misal akses tugas orang lain), kembalikan ke lobi
                     $_SESSION['flash_message'] = ['text' => 'Tugas tidak valid atau bukan milik Anda.', 'type' => 'error'];
                     header('Location: ' . BASE_URL . 'staff/inputOpname');
                     exit;
                 }
 
             } else {
-                // Jika tidak ada Task ID -> Masuk LOBI
                 $data['viewState'] = 'lobby';
                 
-                // 1. Ambil tugas yang SAYA ambil
                 $data['myTasks'] = $opnameModel->getMyActiveTasks($activePeriod['period_id'], $_SESSION['user_id']);
                 
-                // 2. Ambil semua tugas untuk daftar "Tersedia"
                 $data['availableTasks'] = $opnameModel->getTaskProgress($activePeriod['period_id']);
             }
         }
@@ -514,7 +519,6 @@ class StaffController extends Controller {
     public function submitTask($taskId) {
         $opnameModel = $this->model('Opname_model');
         
-        // Logika: submitTask($taskId, $userId)
         if ($opnameModel->submitTask($taskId, $_SESSION['user_id'])) {
             $_SESSION['flash_message'] = ['text' => 'Tugas selesai dan disubmit. Terima kasih!', 'type' => 'success'];
         } else {
@@ -568,7 +572,6 @@ class StaffController extends Controller {
      * Menampilkan halaman Lihat Stok (Read-Only)
      */
     public function viewStok($page = 1) {
-        // 1. Ambil filter (mirip Admin)
         $search = $_GET['search'] ?? '';
         $kategori = $_GET['kategori'] ?? '';
         $merek = $_GET['merek'] ?? '';
@@ -577,22 +580,17 @@ class StaffController extends Controller {
         $page = (int)$page;
         if ($page < 1) $page = 1;
 
-        // 2. Panggil Model yang SAMA dengan Admin
         $productModel = $this->model('Product_model');
         
-        // (Kita anggap status 'Tersedia' saja yang relevan untuk Staff)
         $statusTersedia = $this->model('Status_model')->getStatusIdByName('Tersedia');
         $status_id = $statusTersedia['status_id'] ?? 0;
 
-        // 3. Hitung Total Data
         $totalProducts = $productModel->getTotalProductCount($search, $kategori, $merek, $status_id, '', $lokasi);
         $totalPages = ceil($totalProducts / $limit);
         $offset = ($page - 1) * $limit;
         
-        // 4. Ambil data
         $paginatedProducts = $productModel->getProductsPaginated($limit, $offset, $search, $kategori, $merek, $status_id, '', $lokasi);
 
-        // 5. Siapkan data untuk view
         $data = [
             'judul' => 'Cek Stok Barang',
             'products' => $paginatedProducts,
@@ -607,7 +605,6 @@ class StaffController extends Controller {
             'allLokasi' => $this->model('Lokasi_model')->getAllLokasi()
         ];
         
-        // 6. Panggil view baru
         $this->view('staff/view_stok', $data);
     }
     /**
@@ -618,18 +615,11 @@ class StaffController extends Controller {
         $data = [
             'judul' => 'Cek Lokasi Barang',
             'search' => $search,
-            'results' => [] // Defaultnya array kosong
+            'results' => [] 
         ];
 
-        // Hanya jalankan pencarian jika ada input
         if (!empty($search)) {
-            // Kita gunakan model produk yang sudah ada
             $productModel = $this->model('Product_model');
-            // Kita panggil fungsi yang sudah ada (getStockInfo)
-            // tapi kita harus ambil product_id dulu
-            
-            // (Logika ini bisa disederhanakan, tapi untuk sekarang kita cari berdasarkan nama)
-            // Mari kita buat fungsi baru di Product_model
             $data['results'] = $productModel->findStockLocationsByName($search);
         }
         
@@ -639,21 +629,17 @@ class StaffController extends Controller {
      * Menampilkan halaman Riwayat Input Saya (Read-Only)
      */
     public function riwayatSaya() {
-        // Ambil ID Staff yang sedang login
         $staffId = $_SESSION['user_id'];
         
-        // Panggil model
         $transModel = $this->model('Transaction_model');
         
         $data = [
             'judul' => 'Riwayat Input Saya',
-            // Panggil 3 fungsi baru yang kita buat di model
             'riwayat_masuk' => $transModel->getRiwayatMasukByUserId($staffId),
             'riwayat_keluar' => $transModel->getRiwayatKeluarByUserId($staffId),
             'riwayat_rusak' => $transModel->getRiwayatReturByUserId($staffId)
         ];
         
-        // Panggil view baru
         $this->view('staff/view_riwayat_saya', $data);
     }
     /**

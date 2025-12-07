@@ -250,6 +250,50 @@ class Transaction_model extends Model {
         return $this->resultSet();
     }
 
+    /**
+     * [EXPORT] Mengambil SEMUA riwayat barang keluar untuk Export (Tanpa Limit)
+     */
+    public function getAllRiwayatKeluarForExport($search, $startDate = null, $endDate = null) {
+        $sql = "SELECT 
+                    st.created_at, p.kode_barang, p.nama_barang, st.jumlah, st.keterangan, 
+                    u.nama_lengkap as staff_nama, st.lot_number, s.nama_satuan
+                FROM 
+                    " . $this->table . " st
+                LEFT JOIN products p ON st.product_id = p.product_id
+                LEFT JOIN users u ON st.user_id = u.user_id
+                LEFT JOIN satuan s ON p.satuan_id = s.satuan_id
+                WHERE 
+                    st.tipe_transaksi = 'keluar'";
+        
+        $params = [];
+
+        if (!empty($search)) {
+            $sql .= " AND (
+                p.nama_barang LIKE :search 
+                OR st.lot_number LIKE :search 
+                OR st.keterangan LIKE :search 
+                OR u.nama_lengkap LIKE :search
+                OR s.nama_satuan LIKE :search
+            )";
+            $params[':search'] = '%' . $search . '%';
+        }
+
+        if (!empty($startDate) && !empty($endDate)) {
+            $sql .= " AND DATE(st.created_at) BETWEEN :start AND :end";
+            $params[':start'] = $startDate;
+            $params[':end'] = $endDate;
+        }
+
+        $sql .= " ORDER BY st.created_at DESC"; // Tanpa LIMIT
+
+        $this->query($sql);
+        foreach ($params as $key => $value) {
+            $this->bind($key, $value); 
+        }
+        
+        return $this->resultSet();
+    }
+
     public function addBarangKeluar($data) {
         $this->db->beginTransaction();
         try {
@@ -273,13 +317,14 @@ class Transaction_model extends Model {
             $this->execute();
 
             $this->query("INSERT INTO stock_transactions 
-                            (product_id, user_id, tipe_transaksi, jumlah, lot_number, keterangan) 
-                          VALUES 
-                            (:pid, :uid, 'keluar', :jml, :lot, :ket)");
+                (product_id, user_id, tipe_transaksi, jumlah, satuan_id, lot_number, keterangan) 
+              VALUES 
+                (:pid, :uid, 'keluar', :jml, :sat, :lot, :ket)");
             
             $this->bind('pid', $data['product_id']);
             $this->bind('uid', $data['user_id']);
             $this->bind('jml', $data['jumlah']);
+            $this->bind('sat', $data['satuan_id']);
             $this->bind('lot', $currentStock['lot_number']);
             $this->bind('ket', $data['keterangan']);
             $this->execute();

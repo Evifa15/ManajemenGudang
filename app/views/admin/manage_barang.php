@@ -5,13 +5,12 @@
 
 <main class="app-content">
     
-    <?php
-        if(isset($_SESSION['flash_message'])) {
-            $flash = $_SESSION['flash_message'];
-            echo '<div class="flash-message ' . $flash['type'] . '">' . $flash['text'] . '</div>';
-            unset($_SESSION['flash_message']);
-        }
-    ?>
+    <?php if(isset($_SESSION['flash_message'])): ?>
+        <div class="flash-message <?php echo $_SESSION['flash_message']['type']; ?>">
+            <?php echo $_SESSION['flash_message']['text']; ?>
+        </div>
+        <?php unset($_SESSION['flash_message']); ?>
+    <?php endif; ?>
 
     <div class="top-action-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 20px; flex-wrap: nowrap;">
         
@@ -26,136 +25,96 @@
         </div>
 
         <div class="header-buttons" style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
-            
             <button type="button" id="btnToggleFilter" class="btn btn-secondary" 
-                    style="height: 42px; display: flex; align-items: center; border: 1px solid #cbd5e1; color: #64748b; background: #fff; padding: 0 15px; font-weight: 600; white-space: nowrap;"
-                    title="Buka/Tutup Filter">
+                    style="height: 42px; display: flex; align-items: center; border: 1px solid #cbd5e1; color: #64748b; background: #fff; padding: 0 15px; font-weight: 600; white-space: nowrap;">
                  <i class="ph ph-funnel" style="font-size: 1.2rem; margin-right: 5px;"></i> Filter
             </button>
 
-            <button type="button" id="btnBulkDeleteBarang" class="btn btn-brand-dark" 
-                    style="display: none; height: 42px; align-items: center; padding: 0 15px; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; white-space: nowrap;" 
-                    data-url="<?php echo BASE_URL; ?>admin/deleteBulkBarang">
+            <button type="button" id="btnBulkDeleteBarang" class="btn btn-brand-dark" style="display: none; height: 42px; align-items: center; padding: 0 15px; background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; white-space: nowrap;" data-url="<?php echo BASE_URL; ?>admin/deleteBulkBarang">
                  <i class="ph ph-trash" style="font-size: 1.2rem; margin-right: 5px;"></i> Hapus (<span id="selectedCountBarang">0</span>)
             </button>
 
-            <div class="dropdown-export" style="position: relative; z-index: 1000;">
-                
-                <button type="button" id="btnToggleExport" class="btn btn-brand-dark" style="height: 42px; display: flex; align-items: center; padding: 0 18px;">
-                    <i class="ph ph-export" style="font-size: 1.2rem; margin-right: 8px;"></i> Export
+            <div class="dropdown-export-wrapper">
+                <button type="button" id="btnToggleExportBarang" class="btn btn-export-toggle">
+                    <i class="ph ph-export" style="font-size: 1.2rem; margin-right: 8px;"></i> 
+                    Export 
                     <i class="ph ph-caret-down" style="margin-left: 5px; font-size: 1rem;"></i>
                 </button>
 
-                <div id="exportMenu" class="dropdown-menu">
-                    <a href="#" class="btn-export-action" data-type="excel" data-base-url="<?php echo BASE_URL; ?>">
+                <div id="exportMenuBarang" class="dropdown-menu-custom">
+                    <a href="#" class="btn-export-action" data-type="excel">
                         <i class="ph ph-microsoft-excel-logo" style="color: #10b981; font-size: 1.2rem;"></i> 
                         Excel (.xls)
                     </a>
-                    <a href="#" class="btn-export-action" data-type="csv" data-base-url="<?php echo BASE_URL; ?>">
+                    <a href="#" class="btn-export-action" data-type="csv">
                         <i class="ph ph-file-csv" style="color: #0ea5e9; font-size: 1.2rem;"></i> 
                         CSV (.csv)
                     </a>
-                    <a href="#" class="btn-export-action" data-type="pdf" data-base-url="<?php echo BASE_URL; ?>">
+                    <a href="#" class="btn-export-action" data-type="pdf">
                         <i class="ph ph-file-pdf" style="color: #ef4444; font-size: 1.2rem;"></i> 
                         PDF Document
                     </a>
                 </div>
             </div>
-
             <button type="button" id="btnImportCsv" class="btn btn-brand-dark" style="height: 42px; display: flex; align-items: center; padding: 0 15px; white-space: nowrap;">
                 <i class="ph ph-upload-simple" style="font-size: 1.2rem; margin-right: 5px;"></i> Import
             </button>
-            
-            <a href="<?php echo BASE_URL; ?>admin/masterDataConfig" class="btn btn-brand-dark" 
-               style="height: 42px; display: flex; align-items: center; padding: 0 15px; white-space: nowrap; text-decoration: none;" 
-               title="Konfigurasi Master Data">
+            <a href="<?php echo BASE_URL; ?>admin/masterDataConfig" class="btn btn-brand-dark" style="height: 42px; display: flex; align-items: center; padding: 0 15px; white-space: nowrap; text-decoration: none;" title="Konfigurasi Master Data">
                 <i class="ph ph-gear" style="font-size: 1.2rem; margin-right: 5px;"></i> Config
             </a>
-            
             <a href="<?php echo BASE_URL; ?>admin/addBarang" class="btn btn-brand-dark" style="height: 42px; display: flex; align-items: center; padding: 0 20px; white-space: nowrap; text-decoration: none;">
                 <i class="ph ph-plus" style="font-size: 1.2rem; margin-right: 5px;"></i> Tambah
             </a>
-
         </div>
     </div>
 
-    <div id="filterPanel" class="search-card compact-filter" style="display: none; margin-bottom: 20px;">
-        <div class="filter-row" style="padding: 10px 0;">
+    <div id="filterPanel" class="filter-panel">
+        <div class="filter-grid">
             
             <div class="filter-item">
-                <label>Kategori</label>
-                <select id="filterKategori" class="filter-select-clean live-filter-barang">
-                    <option value="">- Semua Kategori -</option>
-                    <?php foreach($data['allKategori'] as $kat): ?>
-                        <option value="<?php echo $kat['kategori_id']; ?>" <?php if($data['kategori_filter'] == $kat['kategori_id']) echo 'selected'; ?>>
-                            <?php echo $kat['nama_kategori']; ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <label class="filter-label">Kategori</label>
+                <div style="position: relative;">
+                    <select id="filterKategori" class="filter-select-clean">
+                        <option value="">- Semua Kategori -</option>
+                        <?php foreach($data['allKategori'] as $kat): ?>
+                            <option value="<?php echo $kat['kategori_id']; ?>" 
+                                <?php if($data['kategori_filter'] == $kat['kategori_id']) echo 'selected'; ?>>
+                                <?php echo htmlspecialchars($kat['nama_kategori']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <i class="ph ph-caret-down" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;"></i>
+                </div>
             </div>
 
             <div class="filter-item">
-                <label>Merek</label>
-                <select id="filterMerek" class="filter-select-clean live-filter-barang">
-                    <option value="">- Semua Merek -</option>
-                    <?php foreach($data['allMerek'] as $mrk): ?>
-                        <option value="<?php echo $mrk['merek_id']; ?>" <?php if($data['merek_filter'] == $mrk['merek_id']) echo 'selected'; ?>>
-                            <?php echo $mrk['nama_merek']; ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <label class="filter-label">Merek</label>
+                <div style="position: relative;">
+                    <select id="filterMerek" class="filter-select-clean">
+                        <option value="">- Semua Merek -</option>
+                        <?php foreach($data['allMerek'] as $mrk): ?>
+                            <option value="<?php echo $mrk['merek_id']; ?>" 
+                                <?php if($data['merek_filter'] == $mrk['merek_id']) echo 'selected'; ?>>
+                                <?php echo htmlspecialchars($mrk['nama_merek']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <i class="ph ph-caret-down" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;"></i>
+                </div>
             </div>
+            
+            <input type="hidden" id="filterStatus" value="">
+            <input type="hidden" id="filterLokasi" value=""> 
 
             <div class="filter-item">
-                <label>Status Stok</label>
-                <select id="filterStatus" class="filter-select-clean live-filter-barang">
-                    <option value="">- Semua Status -</option>
-                    <?php foreach($data['allStatus'] as $stat): ?>
-                        <option value="<?php echo $stat['status_id']; ?>" <?php if($data['status_filter'] == $stat['status_id']) echo 'selected'; ?>>
-                            <?php echo $stat['nama_status']; ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div class="filter-item">
-                <label>Lokasi Rak</label>
-                <select id="filterLokasi" class="filter-select-clean live-filter-barang">
-                    <option value="">- Semua Lokasi -</option>
-                    <?php foreach($data['allLokasi'] as $lok): ?>
-                        <option value="<?php echo $lok['lokasi_id']; ?>" <?php if($data['lokasi_filter'] == $lok['lokasi_id']) echo 'selected'; ?>>
-                            <?php echo $lok['kode_lokasi']; ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div class="filter-item action" style="flex: 0 0 auto;">
-                <label>&nbsp;</label>
-                <button type="button" id="btnResetFilter" class="btn-reset" title="Reset Filter"
-                        style="background-color: #152e4d; color: #ffffff; border: 1px solid #152e4d; cursor: pointer;">
-                    <i class="ph ph-arrow-counter-clockwise" style="font-weight: bold;"></i>
+                <label class="filter-label">&nbsp;</label> 
+                <button type="button" id="btnResetFilter" class="btn-reset-filter" title="Reset Semua Filter">
+                    <i class="ph ph-arrow-counter-clockwise" style="margin-right: 5px; font-size: 1.2rem;"></i> Reset
                 </button>
             </div>
+
         </div>
     </div>
-
-    <script>
-        document.getElementById('btnToggleFilter').addEventListener('click', function() {
-            var panel = document.getElementById('filterPanel');
-            if (panel.style.display === 'none') {
-                panel.style.display = 'block';
-                this.style.backgroundColor = '#e2e8f0';
-                this.style.color = '#152e4d';
-                this.style.borderColor = '#152e4d';
-            } else {
-                panel.style.display = 'none';
-                this.style.backgroundColor = '#fff'; 
-                this.style.color = '#64748b';
-                this.style.borderColor = '#cbd5e1';
-            }
-        });
-    </script>
 
     <div class="table-card">
         <div class="table-wrapper-flat">
@@ -165,65 +124,36 @@
                         <th style="text-align:center; width: 40px;">
                             <input type="checkbox" id="selectAllBarang" style="transform: scale(1.2); cursor: pointer;">
                         </th>
-                        <th>Kode Barang</th>
-                        <th>Nama Barang</th>
-                        <th>Kategori</th>
-                        <th>Merek</th>
-                        <th>Stok Saat Ini</th>
-                        <th>Satuan</th>
-                        <th>Status</th> 
-                        <th style="min-width: 200px;">Aksi</th>
+                        <th style="width: 15%;">Kode Barang</th>
+                        <th style="width: 25%;">Nama Barang</th>
+                        <th style="width: 15%;">Kategori</th>
+                        <th style="width: 15%;">Merek</th>
+                        <th style="width: 10%;">Stok Min.</th>
+                        <th style="min-width: 150px; text-align: center;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="barangTableBody">
                     <?php if (empty($data['products'])): ?>
-                        <tr><td colspan="9" style="text-align:center; padding: 30px; color: #999;">Data tidak ditemukan.</td></tr>
+                        <tr><td colspan="7" style="text-align:center; padding: 30px; color: #999;">Data tidak ditemukan.</td></tr>
                     <?php else: ?>
-                        <?php foreach ($data['products'] as $prod) : 
-                            $stok = (int)$prod['stok_saat_ini'];
-                            $min = (int)$prod['stok_minimum'];
-                            $statusBadge = '';
-                            
-                            if ($stok == 0) {
-                                $statusBadge = '<span style="background:#fee2e2; color:#991b1b; padding:4px 10px; border-radius:20px; font-size:0.8rem; font-weight:700; border:1px solid #fecaca;">Habis</span>';
-                            } elseif ($stok <= $min) {
-                                $statusBadge = '<span style="background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:20px; font-size:0.8rem; font-weight:700; border:1px solid #fde68a;">Menipis</span>';
-                            } else {
-                                $statusBadge = '<span style="background:#dcfce7; color:#166534; padding:4px 10px; border-radius:20px; font-size:0.8rem; font-weight:700; border:1px solid #bbf7d0;">Aman</span>';
-                            }
-                        ?>
+                        <?php foreach ($data['products'] as $prod) : ?>
                         <tr>
                             <td style="text-align:center;">
                                 <input type="checkbox" class="barang-checkbox" value="<?php echo $prod['product_id']; ?>" style="transform: scale(1.2); cursor: pointer;">
                             </td>
-                            <td style="font-weight: 500; color: #64748b;"><?php echo htmlspecialchars($prod['kode_barang']); ?></td>
+                            <td style="font-weight: 500; color: #64748b; font-family: monospace;"><?php echo htmlspecialchars($prod['kode_barang']); ?></td>
                             <td><strong><?php echo htmlspecialchars($prod['nama_barang']); ?></strong></td>
                             <td><?php echo htmlspecialchars($prod['nama_kategori']); ?></td>
                             <td><?php echo htmlspecialchars($prod['nama_merek']); ?></td>
-                            <td><strong><?php echo $stok; ?></strong></td> 
-                            <td><?php echo htmlspecialchars($prod['nama_satuan']); ?></td>
-                            <td><?php echo $statusBadge; ?></td> 
                             
-                            <td>
-                                <div class="action-buttons">
-                                    <a href="<?php echo BASE_URL; ?>admin/detailBarang/<?php echo $prod['product_id']; ?>" 
-                                       class="btn-icon detail" title="Detail">
-                                        <i class="ph ph-info"></i>
-                                    </a>
-                                    <a href="<?php echo BASE_URL; ?>admin/cetakLabel/<?php echo $prod['product_id']; ?>" 
-                                       class="btn-icon print" title="Cetak Barcode">
-                                        <i class="ph ph-printer"></i>
-                                    </a>
-                                    <a href="<?php echo BASE_URL; ?>admin/editBarang/<?php echo $prod['product_id']; ?>" 
-                                       class="btn-icon edit" title="Edit">
-                                        <i class="ph ph-pencil-simple"></i>
-                                    </a>
-                                    <button type="button" 
-                                            class="btn-icon delete btn-delete" 
-                                            data-url="<?php echo BASE_URL; ?>admin/deleteBarang/<?php echo $prod['product_id']; ?>"
-                                            title="Hapus">
-                                        <i class="ph ph-trash"></i>
-                                    </button>
+                            <td><?php echo (int)$prod['stok_minimum']; ?></td> 
+                            
+                            <td style="text-align: center;">
+                                <div class="action-buttons" style="justify-content: center;">
+                                    <a href="<?php echo BASE_URL; ?>admin/detailBarang/<?php echo $prod['product_id']; ?>" class="btn-icon detail" title="Detail"><i class="ph ph-info"></i></a>
+                                    <a href="<?php echo BASE_URL; ?>admin/cetakLabel/<?php echo $prod['product_id']; ?>" class="btn-icon print" title="Cetak Barcode"><i class="ph ph-printer"></i></a>
+                                    <a href="<?php echo BASE_URL; ?>admin/editBarang/<?php echo $prod['product_id']; ?>" class="btn-icon edit" title="Edit"><i class="ph ph-pencil-simple"></i></a>
+                                    <button type="button" class="btn-icon delete btn-delete" data-url="<?php echo BASE_URL; ?>admin/deleteBarang/<?php echo $prod['product_id']; ?>" title="Hapus"><i class="ph ph-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
@@ -241,7 +171,6 @@
                 <?php
                     $currentPage = $data['currentPage'];
                     $totalPages = $data['totalPages'];
-                    
                     $prevDisabled = ($currentPage <= 1) ? 'disabled' : '';
                     echo '<li class="page-item '.$prevDisabled.'"><a class="page-link" href="#" data-page="'.($currentPage - 1).'">Previous</a></li>';
                     
@@ -249,25 +178,20 @@
                     $end = min($totalPages, $currentPage + 2);
                     
                     if($start > 1) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-
                     if($totalPages > 0) {
                         for ($i = $start; $i <= $end; $i++) {
                             $active = ($i == $currentPage) ? 'active' : '';
                             echo '<li class="page-item '.$active.'"><a class="page-link" href="#" data-page="'.$i.'">'.$i.'</a></li>';
                         }
                     }
-
                     if($end < $totalPages) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-
+                    
                     $nextDisabled = ($currentPage >= $totalPages) ? 'disabled' : '';
                     echo '<li class="page-item '.$nextDisabled.'"><a class="page-link" href="#" data-page="'.($currentPage + 1).'">Next</a></li>';
                 ?>
             </ul>
         </nav>
     </div>
-
 </main>
 
-<?php
-    require_once APPROOT . '/views/templates/footer.php';
-?>
+<?php require_once APPROOT . '/views/templates/footer.php'; ?>

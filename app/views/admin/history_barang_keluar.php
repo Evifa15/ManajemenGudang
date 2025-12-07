@@ -3,82 +3,155 @@
     require_once APPROOT . '/views/templates/sidebar_admin.php';
 ?>
 
-<main class="app-content">
+<main class="app-content" data-base-url="<?php echo BASE_URL; ?>">
     
+    <?php if(isset($_SESSION['flash_message'])): ?>
+        <div class="flash-message <?php echo $_SESSION['flash_message']['type']; ?>">
+            <?php echo $_SESSION['flash_message']['text']; ?>
+        </div>
+        <?php unset($_SESSION['flash_message']); ?>
+    <?php endif; ?>
+
     <div class="content-header">
-        <h1>Riwayat Barang Keluar</h1>
-    </div>
+        </div>
 
-    <div class="search-container" style="padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px;">
-        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+    <div class="history-top-bar">
+        
+        <div class="history-search-wrapper">
+            <input type="text" id="liveSearchKeluar" 
+                   class="history-search-input" 
+                   placeholder="Cari Barang, Tujuan, Lot, atau Staff..." 
+                   value="<?php echo htmlspecialchars($data['search']); ?>"
+                   autocomplete="off">
+        </div>
+
+        <div class="history-header-buttons">
             
-            <div style="flex: 2; min-width: 250px;">
-                <label style="font-weight:bold; font-size:0.85em; color:#666; display:block; margin-bottom:5px;">Pencarian Universal:</label>
-                <input type="text" id="liveSearchKeluar" class="form-control" 
-                       placeholder="🔍 Cari Barang, Tujuan, Lot, atau Staff..." 
-                       value="<?php echo htmlspecialchars($data['search']); ?>"
-                       data-base-url="<?php echo BASE_URL; ?>"
-                       style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
-            </div>
+            <button type="button" id="btnToggleFilter" class="btn btn-secondary" 
+                    style="height: 42px; display: flex; align-items: center; border: 1px solid #cbd5e1; color: #64748b; background: #fff; padding: 0 15px; font-weight: 600; white-space: nowrap;"
+                    title="Buka/Tutup Filter Tanggal">
+                 <i class="ph ph-funnel" style="font-size: 1.2rem; margin-right: 5px;"></i> Filter
+            </button>
 
-            <div style="flex: 1; min-width: 130px;">
-                <label for="startDateKeluar" style="font-weight:bold; font-size:0.85em; color:#666; display:block; margin-bottom:5px;">Dari Tanggal:</label>
-                <input type="date" id="startDateKeluar" class="form-control" 
-                       value="<?php echo htmlspecialchars($data['start_date'] ?? ''); ?>"
-                       style="width: 100%; padding: 9px; border: 1px solid #ccc; border-radius: 5px;">
-            </div>
+            <div class="dropdown-export-wrapper">
+                <button type="button" id="btnToggleExportKeluar" class="btn btn-brand-dark" 
+                        style="height: 42px; display: flex; align-items: center; padding: 0 18px; white-space: nowrap;">
+                    <i class="ph ph-export" style="font-size: 1.2rem; margin-right: 8px;"></i> Export
+                    <i class="ph ph-caret-down" style="margin-left: 5px; font-size: 1rem;"></i>
+                </button>
 
-            <div style="flex: 1; min-width: 130px;">
-                <label for="endDateKeluar" style="font-weight:bold; font-size:0.85em; color:#666; display:block; margin-bottom:5px;">Sampai Tanggal:</label>
-                <input type="date" id="endDateKeluar" class="form-control" 
-                       value="<?php echo htmlspecialchars($data['end_date'] ?? ''); ?>"
-                       style="width: 100%; padding: 9px; border: 1px solid #ccc; border-radius: 5px;">
+                <div id="exportMenuKeluar" class="dropdown-menu-custom">
+                    <a href="#" class="btn-export-keluar-action" data-type="excel">
+                        <i class="ph ph-microsoft-excel-logo" style="color: #10b981; font-size: 1.2rem;"></i> 
+                        Excel (.xls)
+                    </a>
+                    <a href="#" class="btn-export-keluar-action" data-type="csv">
+                        <i class="ph ph-file-csv" style="color: #0ea5e9; font-size: 1.2rem;"></i> 
+                        CSV (.csv)
+                    </a>
+                    <a href="#" class="btn-export-keluar-action" data-type="pdf">
+                        <i class="ph ph-file-pdf" style="color: #ef4444; font-size: 1.2rem;"></i> 
+                        PDF Document
+                    </a>
+                </div>
             </div>
-
-            <div>
-                <a href="<?php echo BASE_URL; ?>admin/riwayatBarangKeluar" class="btn btn-danger" style="padding: 10px 15px; height: 42px; display: flex; align-items: center;" title="Reset">↻</a>
-            </div>
+            
         </div>
     </div>
 
-    <div class="content-table">
-        <table>
-            <thead>
-                <tr>
-                    <th>Tanggal Keluar</th>
-                    <th>Nama Barang</th>
-                    <th>Jumlah</th>
-                    <th>Satuan</th>
-                    <th>Tujuan / Keterangan</th>
-                    <th>Diambil oleh</th>
-                    <th>Lot/Batch</th>
-                </tr>
-            </thead>
-            <tbody id="tableBodyKeluar">
-                <?php if (empty($data['history'])): ?>
-                    <tr><td colspan="7" style="text-align:center;">Data tidak ditemukan.</td></tr>
-                <?php else: ?>
-                    <?php foreach ($data['history'] as $his) : ?>
+    <div id="filterPanel" class="search-card compact-filter" style="display: none; margin-bottom: 20px;">
+        
+        <div class="filter-panel-row">
+            <div class="filter-panel-item">
+                <label class="filter-label">Dari Tanggal</label>
+                <input type="date" id="startDateKeluar" class="filter-select-clean" 
+                       value="<?php echo htmlspecialchars($data['start_date']); ?>">
+            </div>
+
+            <div class="filter-panel-item">
+                <label class="filter-label">Sampai Tanggal</label>
+                <input type="date" id="endDateKeluar" class="filter-select-clean" 
+                       value="<?php echo htmlspecialchars($data['end_date']); ?>">
+            </div>
+
+            <div style="flex: 0 0 auto;">
+                <button type="button" id="btnResetKeluar" class="btn-reset-filter" title="Reset Filter">
+                    <i class="ph ph-arrow-counter-clockwise" style="font-size: 1.2rem; font-weight: bold;"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div style="padding-bottom: 10px;">
+            <small style="color: #94a3b8;">*Data otomatis diperbarui saat tanggal dipilih.</small>
+        </div>
+    </div>
+    
+    <div class="table-card">
+        <div class="table-wrapper-flat">
+            <table>
+                <thead>
                     <tr>
-                        <td><?php echo date('d-m-Y H:i', strtotime($his['created_at'])); ?></td>
-                        <td><?php echo htmlspecialchars($his['nama_barang']); ?></td>
-                        <td><strong><?php echo (int)$his['jumlah']; ?></strong></td> 
-                        <td><?php echo htmlspecialchars($his['nama_satuan']); ?></td> 
-                        <td><?php echo htmlspecialchars($his['keterangan']); ?></td>
-                        <td><?php echo htmlspecialchars($his['staff_nama']); ?></td>
-                        <td><?php echo htmlspecialchars($his['lot_number']); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
+                        <th>Tanggal Keluar</th>
+                        <th>Nama Barang</th>
+                        <th>Jumlah</th>
+                        <th>Satuan</th>
+                        <th>Tujuan / Keterangan</th>
+                        <th>Diambil Oleh</th>
+                        <th>Lot/Batch</th>
+                        <th>Aksi</th> </tr>
+                </thead>
+                <tbody id="tableBodyKeluar">
+                    <?php if (empty($data['history'])): ?>
+                        <tr><td colspan="8" style="text-align:center; padding: 30px; color: #999;">Data tidak ditemukan.</td></tr>
+                    <?php else: ?>
+                        <?php foreach ($data['history'] as $his) : 
+                            $detailUrl = BASE_URL . 'admin/detailBarangKeluar/' . $his['transaction_id'];
+                        ?>
+                        <tr>
+                            <td style="color: #334155; font-size: 0.9rem;">
+                                <?php echo date('d-m-Y H:i', strtotime($his['created_at'])); ?>
+                            </td>
+                            <td>
+                                <strong style="color: #152e4d;"><?php echo htmlspecialchars($his['nama_barang']); ?></strong>
+                            </td>
+                            <td style="font-size: 1rem; color: #ef4444;">
+                                <strong>-<?php echo (int)$his['jumlah']; ?></strong>
+                            </td> 
+                            <td style="color: #64748b;">
+                                <?php echo htmlspecialchars($his['nama_satuan']); ?>
+                            </td> 
+                            <td style="color: #475569;">
+                                <?php echo htmlspecialchars($his['keterangan']); ?>
+                            </td>
+                            <td>
+                                <span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; color: #475569;">
+                                    <?php echo htmlspecialchars($his['staff_nama']); ?>
+                                </span>
+                            </td>
+                            <td style="font-family: monospace; color: #2f8ba9;">
+                                <?php echo htmlspecialchars($his['lot_number']); ?>
+                            </td>
+                            <td style="text-align: center;">
+                                <div class="action-buttons" style="justify-content: center;">
+                                     <a href="<?php echo $detailUrl; ?>" class="btn-icon detail" title="Lihat Detail Lengkap">
+                                        <i class="ph ph-info"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div class="pagination-container" id="paginationContainerKeluar">
+    <div class="pagination-container custom-pagination" id="paginationContainerKeluar">
         <span class="pagination-info">Menampilkan Halaman <?php echo $data['currentPage']; ?> dari <?php echo $data['totalPages']; ?></span>
         <nav>
             <ul class="pagination">
                 <?php
+                    // Render awal PHP (akan diganti JS saat filter aktif)
                     $currentPage = $data['currentPage'];
                     $totalPages = $data['totalPages'];
                     
@@ -88,10 +161,15 @@
                     if($totalPages > 0) {
                         $start = max(1, $currentPage - 2);
                         $end = min($totalPages, $currentPage + 2);
+                        
+                        if($start > 1) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+
                         for ($i = $start; $i <= $end; $i++) {
                             $active = ($i == $currentPage) ? 'active' : '';
                             echo '<li class="page-item '.$active.'"><a class="page-link" href="#" data-page="'.$i.'">'.$i.'</a></li>';
                         }
+
+                        if($end < $totalPages) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
                     }
 
                     $nextDisabled = ($currentPage >= $totalPages) ? 'disabled' : '';

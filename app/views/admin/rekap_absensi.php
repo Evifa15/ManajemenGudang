@@ -335,12 +335,32 @@
                     </div>
                     
                     <div class="filter-item action" style="display: flex; gap: 8px;">
-                        <button type="button" onclick="exportLaporan()" class="btn btn-primary btn-sm" 
-                                style="height: 42px; background-color: #152e4d; border-color: #152e4d; font-weight: 600; padding: 0 25px;" 
-                                title="Download Excel/CSV">
-                            <i class="ph ph-microsoft-excel-logo" style="font-size: 1.2rem; margin-right: 5px;"></i> Export
+    
+    <div class="dropdown-export-wrapper" style="position: relative; z-index: 100;">
+                        
+                        <button type="button" id="btnToggleExportAbsensi" class="btn-export-toggle">
+                            <i class="ph ph-export" style="font-size: 1.2rem;"></i> 
+                            Export
+                            <i class="ph ph-caret-down" style="margin-left: 5px; font-size: 0.9rem;"></i>
                         </button>
+
+                        <div id="exportMenuAbsensi" class="dropdown-menu-custom">
+                            <a href="#" class="btn-export-action btn-export-absensi-action" data-type="excel">
+                                <i class="ph ph-microsoft-excel-logo" style="color: #10b981;"></i> 
+                                Excel (.xls)
+                            </a>
+                            <a href="#" class="btn-export-action btn-export-absensi-action" data-type="csv">
+                                <i class="ph ph-file-csv" style="color: #0ea5e9;"></i> 
+                                CSV (.csv)
+                            </a>
+                            <a href="#" class="btn-export-action btn-export-absensi-action" data-type="pdf">
+                                <i class="ph ph-file-pdf" style="color: #ef4444;"></i> 
+                                PDF Document
+                            </a>
+                        </div>
                     </div>
+
+</div>
                 </div>
             </form>
         </div>

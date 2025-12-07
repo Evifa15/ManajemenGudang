@@ -68,29 +68,29 @@ class Merek_model extends Model {
      * Menyimpan data merek baru ke database
      */
     public function createMerek($data) {
-        // Tambahkan kolom deskripsi ke query INSERT
-        $this->query("INSERT INTO " . $this->table . " (nama_merek, deskripsi) VALUES (:nama_merek, :deskripsi)");
-        $this->bind('nama_merek', $data['nama_merek']);
-        $this->bind('deskripsi', $data['deskripsi']); // Bind data deskripsi
-        return $this->execute();
+    $this->query("INSERT INTO merek (nama_merek, deskripsi, status) VALUES (:nama_merek, :deskripsi, :status)");
+    $this->bind('nama_merek', $data['nama_merek']);
+    $this->bind('deskripsi', $data['deskripsi']);
+    $this->bind('status', $data['status']); 
+    return $this->execute();
     }
 
     /**
      * Mengupdate data merek di database
      */
     public function updateMerek($data) {
-        // Tambahkan kolom deskripsi ke query UPDATE
-        $this->query("UPDATE " . $this->table . " SET 
-                        nama_merek = :nama_merek,
-                        deskripsi = :deskripsi
-                      WHERE merek_id = :merek_id");
+    $this->query("UPDATE merek SET 
+                    nama_merek = :nama_merek,
+                    deskripsi = :deskripsi,
+                    status = :status
+                  WHERE merek_id = :merek_id");
 
-        $this->bind('nama_merek', $data['nama_merek']);
-        $this->bind('deskripsi', $data['deskripsi']); // Bind data deskripsi
-        $this->bind('merek_id', $data['merek_id'], PDO::PARAM_INT);
-
-        return $this->execute();
-    }
+    $this->bind('nama_merek', $data['nama_merek']);
+    $this->bind('deskripsi', $data['deskripsi']);
+    $this->bind('status', $data['status']); 
+    $this->bind('merek_id', $data['merek_id'], PDO::PARAM_INT);
+    return $this->execute();
+}
 
     /**
      * Menghapus data merek dari database berdasarkan ID
@@ -100,11 +100,12 @@ class Merek_model extends Model {
         $this->bind('id', $id, PDO::PARAM_INT);
         return $this->execute();
     }
-    // (Tambahkan ini di mana saja di dalam class Merek_model)
+
     public function getAllMerek() {
         $this->query("SELECT * FROM " . $this->table . " ORDER BY nama_merek ASC");
         return $this->resultSet();
     }
+
     /**
      * Menghapus banyak merek sekaligus (Bulk Delete)
      */
@@ -118,5 +119,13 @@ class Merek_model extends Model {
         }
         
         return $this->execute();
+    }
+
+    /**
+     * Fungsi ini khusus dipanggil saat Input Barang Baru
+     */
+    public function getActiveMerek() {
+        $this->query("SELECT * FROM merek WHERE status = 'Aktif' ORDER BY nama_merek ASC");
+        return $this->resultSet();
     }
 }

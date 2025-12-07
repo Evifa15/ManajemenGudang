@@ -223,7 +223,7 @@ class ProfileController extends Controller {
             // [BARU] Tambahkan konfigurasi tombol kembali
             'back_button' => [
                 'url' => BASE_URL . 'profile/index',
-                'label' => 'Kembali ke Profil'
+                'label' => 'Kembali' 
             ]
         ];
         

@@ -947,7 +947,8 @@ exit;
         $data = [
             'merek_id'   => $_POST['merek_id'] ?? null,
             'nama_merek' => $_POST['nama_merek'],    
-            'deskripsi'  => $_POST['deskripsi']
+            'deskripsi'  => $_POST['deskripsi'],
+            'status'     => $_POST['status']
         ];
 
         $merekModel = $this->model('Merek_model');
@@ -1241,90 +1242,60 @@ exit;
     */
 
     /**
-     * Menampilkan halaman Manajemen Barang (Updated: Remove Columns from AJAX)
+     * Menampilkan halaman Manajemen Barang (Versi Ringkas: Master Data Only)
      */
     public function barang($page = 1) {
-        // 1. Ambil parameter filter dari URL
+        // 1. Ambil parameter filter dari URL (Hapus Status & Lokasi)
         $search = $_GET['search'] ?? '';
         $kategori = $_GET['kategori'] ?? '';
         $merek = $_GET['merek'] ?? '';
-        $status = $_GET['status'] ?? '';
-        $satuan = $_GET['satuan'] ?? '';
-        $lokasi = $_GET['lokasi'] ?? '';
         
-        $limit = 10; // Limit per halaman
+        $limit = 10; 
         $page = (int)$page;
         if ($page < 1) $page = 1;
 
         $productModel = $this->model('Product_model');
         
-        // 2. Hitung Total Data (untuk Paginasi)
-        $totalProducts = $productModel->getTotalProductCount($search, $kategori, $merek, $status, $satuan, $lokasi);
+        // 2. Hitung Total Data
+        // (Parameter status & lokasi dikosongkan/dihapus)
+        $totalProducts = $productModel->getTotalProductCount($search, $kategori, $merek);
         $totalPages = ceil($totalProducts / $limit);
         $offset = ($page - 1) * $limit;
         
-        // 3. Ambil Data Produk
-        $paginatedProducts = $productModel->getProductsPaginated($limit, $offset, $search, $kategori, $merek, $status, $satuan, $lokasi);
+        // 3. Ambil Data Produk Master Saja
+        $paginatedProducts = $productModel->getProductsPaginated($limit, $offset, $search, $kategori, $merek);
 
         // ----------------------------------------------------------------
-        // 4. [AJAX] Render HTML Tabel (KHUSUS REQUEST LIVE SEARCH)
+        // 4. [AJAX] Render HTML Tabel
         // ----------------------------------------------------------------
         if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
             header('Content-Type: application/json');
             
             $html = '';
             if (empty($paginatedProducts)) {
-                // Colspan 9 karena kolom sudah dikurangi (dari 11 jadi 9)
-                $html = '<tr><td colspan="9" style="text-align:center;">Data tidak ditemukan.</td></tr>';
+                $html = '<tr><td colspan="7" style="text-align:center;">Data tidak ditemukan.</td></tr>';
             } else {
                 foreach ($paginatedProducts as $prod) {
-                    // URL Aksi
                     $detailUrl = BASE_URL . 'admin/detailBarang/' . $prod['product_id'];
                     $editUrl = BASE_URL . 'admin/editBarang/' . $prod['product_id'];
                     $cetakUrl = BASE_URL . 'admin/cetakLabel/' . $prod['product_id'];
                     $deleteUrl = BASE_URL . 'admin/deleteBarang/' . $prod['product_id'];
                     
-                    // Logika Status Badge
-                    $stok = (int)$prod['stok_saat_ini'];
-                    $min = (int)$prod['stok_minimum'];
-                    $statusBadge = '';
-                    
-                    if ($stok == 0) {
-                        $statusBadge = '<span style="background:#fee2e2; color:#991b1b; padding:4px 10px; border-radius:20px; font-size:0.8rem; font-weight:700; border:1px solid #fecaca;">Habis</span>';
-                    } elseif ($stok <= $min) {
-                        $statusBadge = '<span style="background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:20px; font-size:0.8rem; font-weight:700; border:1px solid #fde68a;">Menipis</span>';
-                    } else {
-                        $statusBadge = '<span style="background:#dcfce7; color:#166534; padding:4px 10px; border-radius:20px; font-size:0.8rem; font-weight:700; border:1px solid #bbf7d0;">Aman</span>';
-                    }
-
-                    // Susun HTML Baris (TR)
                     $html .= '<tr>';
                     
-                    // 1. Checkbox
-                    $html .= '<td style="text-align:center;">
-                                <input type="checkbox" class="barang-checkbox" value="'.$prod['product_id'].'" style="transform: scale(1.2); cursor: pointer;">
-                              </td>';
+                    // Checkbox
+                    $html .= '<td style="text-align:center;"><input type="checkbox" class="barang-checkbox" value="'.$prod['product_id'].'" style="transform: scale(1.2); cursor: pointer;"></td>';
                     
-                    // 2-7. Data Kolom Utama
-                    $html .= '<td>' . htmlspecialchars($prod['kode_barang']) . '</td>';
-                    $html .= '<td>' . htmlspecialchars($prod['nama_barang']) . '</td>';
+                    // Data Kolom (Kode, Nama, Kategori, Merek, Stok Min)
+                    $html .= '<td style="font-family:monospace;">' . htmlspecialchars($prod['kode_barang']) . '</td>';
+                    $html .= '<td><strong>' . htmlspecialchars($prod['nama_barang']) . '</strong></td>';
                     $html .= '<td>' . htmlspecialchars($prod['nama_kategori']) . '</td>';
                     $html .= '<td>' . htmlspecialchars($prod['nama_merek']) . '</td>';
-                    $html .= '<td><strong>' . $stok . '</strong></td>';
-                    $html .= '<td>' . htmlspecialchars($prod['nama_satuan']) . '</td>';
+                    $html .= '<td>' . (int)$prod['stok_minimum'] . '</td>';
                     
-                    // [DIHAPUS] Kolom Stok Minimum
-                    // $html .= '<td>...</td>'; 
-                    
-                    // 8. Status
-                    $html .= '<td>' . $statusBadge . '</td>';
-                    
-                    // [DIHAPUS] Kolom Lokasi
-                    // $html .= '<td>...</td>';
-                    
-                    // 9. Aksi
-                    $html .= '<td>
-                                <div class="action-buttons">
+                    // Aksi
+                    $html .= '<td style="text-align:center;">
+                                <div class="action-buttons" style="justify-content: center;">
                                     <a href="'.$detailUrl.'" class="btn-icon detail" title="Detail"><i class="ph ph-info"></i></a>
                                     <a href="'.$cetakUrl.'" class="btn-icon print" title="Cetak Barcode"><i class="ph ph-printer"></i></a>
                                     <a href="'.$editUrl.'" class="btn-icon edit" title="Edit"><i class="ph ph-pencil-simple"></i></a>
@@ -1335,17 +1306,16 @@ exit;
                 }
             }
 
-            // Kirim JSON ke JS
             echo json_encode([
                 'html' => $html, 
                 'totalPages' => $totalPages, 
                 'currentPage' => $page 
             ]);
-            exit; // Stop agar tidak load view di bawah
+            exit;
         }
 
         // ----------------------------------------------------------------
-        // 5. View Normal (Load Halaman Awal)
+        // 5. View Normal
         // ----------------------------------------------------------------
         $data = [
             'judul' => 'Manajemen Barang',
@@ -1354,19 +1324,12 @@ exit;
             'currentPage' => $page,
             'search' => $search,
             
-            // Kirim nilai filter balik ke view agar dropdown selected
             'kategori_filter' => $kategori,
             'merek_filter' => $merek,
-            'status_filter' => $status,
-            'satuan_filter' => $satuan,
-            'lokasi_filter' => $lokasi,
             
-            // Data Master untuk Dropdown
+            // Dropdown (Status dihapus dari sini)
             'allKategori' => $this->model('Kategori_model')->getAllKategori(),
-            'allMerek' => $this->model('Merek_model')->getAllMerek(),
-            'allStatus' => $this->model('Status_model')->getAllStatus(),
-            'allSatuan' => $this->model('Satuan_model')->getAllSatuan(),
-            'allLokasi' => $this->model('Lokasi_model')->getAllLokasi()
+            'allMerek' => $this->model('Merek_model')->getAllMerek()
         ];
         
         $this->view('admin/manage_barang', $data);
@@ -1380,7 +1343,7 @@ exit;
             'judul' => 'Tambah Barang Baru',
         
             'kategori' => $this->model('Kategori_model')->getAllKategori(),
-            'merek'    => $this->model('Merek_model')->getAllMerek(),
+            'merek'    => $this->model('Merek_model')->getActiveMerek(),
             'satuan'   => $this->model('Satuan_model')->getAllSatuan(),
             'lokasi'   => $this->model('Lokasi_model')->getAllLokasi(),
             'status'   => $this->model('Status_model')->getAllStatus(),
@@ -1388,14 +1351,14 @@ exit;
             // Tambahkan Suppliers jika form membutuhkannya (Opsional, hapus jika error)
             'suppliers' => $this->model('Supplier_model')->getAllSuppliers(),
             
-            'barang'   => null
+            'barang'   => null,
+            'back_button' => [
+                'url' => BASE_URL . 'admin/barang',
+                'label' => 'Kembali'
+            ]
         ];
 
-        // Memuat View secara berurutan agar tampilan utuh
-        $this->view('templates/header', $data);
-        $this->view('templates/sidebar_admin', $data);
         $this->view('admin/form_barang', $data);
-        $this->view('templates/footer');
     }
 
     /**
@@ -1469,6 +1432,39 @@ exit;
         header('Location: ' . BASE_URL . 'admin/barang');
         exit;
     }
+    /**
+     * Menampilkan Halaman Detail Barang (Master Data)
+     */
+    public function detailBarang($id) {
+        // 1. Panggil Model
+        $productModel = $this->model('Product_model');
+
+        // 2. Ambil Data Lengkap (Join Kategori, Merek, Satuan, Stok)
+        // Pastikan fungsi getProductByIdWithDetails ada di Product_model (sudah saya cek, ada)
+        $product = $productModel->getProductByIdWithDetails($id);
+
+        // 3. Validasi jika barang tidak ditemukan (misal ID salah ketik di URL)
+        if (!$product) {
+            $_SESSION['flash_message'] = ['text' => 'Data barang tidak ditemukan.', 'type' => 'error'];
+            header('Location: ' . BASE_URL . 'admin/barang');
+            exit;
+        }
+
+        // 4. Siapkan Data untuk View
+        $data = [
+            'judul' => 'Detail Barang',
+            'product' => $product,
+            
+            // Konfigurasi Tombol Kembali di Header
+            'back_button' => [
+                'url' => BASE_URL . 'admin/barang',
+                'label' => 'Kembali'
+            ]
+        ];
+
+        // 5. Panggil View
+        $this->view('admin/detail_barang', $data);
+    }
 
     /**
      * Menampilkan halaman form edit barang (berdasarkan ID)
@@ -1491,7 +1487,11 @@ exit;
             'satuan' => $this->model('Satuan_model')->getAllSatuan(),
             'lokasi' => $this->model('Lokasi_model')->getAllLokasi(),
             'status' => $this->model('Status_model')->getAllStatus(),
-            'barang'  => $productData // Kirim data barang yang akan diedit
+            'barang'  => $productData,
+            'back_button' => [
+                'url' => BASE_URL . 'admin/barang',
+                'label' => 'Kembali'
+            ]
         ];
         
         // Kita gunakan view form_barang.php yang sama
@@ -1653,6 +1653,11 @@ exit;
             } else {
                 foreach ($paginatedHistory as $his) {
                     $tglInput = date('d-m-Y H:i', strtotime($his['created_at']));
+                    $tombolDetail = '<a href="' . BASE_URL . 'admin/detailBarangKeluar/' . $his['transaction_id'] . '" 
+                                       class="btn-icon detail" 
+                                       title="Lihat Detail Lengkap">
+                                        <i class="ph ph-info"></i>
+                                     </a>';
                     $html .= '<tr>';
                     $html .= '<td>' . $tglInput . '</td>';
                     $html .= '<td>' . htmlspecialchars($his['nama_barang']) . '</td>';
@@ -1661,6 +1666,7 @@ exit;
                     $html .= '<td>' . htmlspecialchars($his['keterangan']) . '</td>';
                     $html .= '<td>' . htmlspecialchars($his['staff_nama']) . '</td>';
                     $html .= '<td>' . htmlspecialchars($his['lot_number']) . '</td>';
+                    $html .= '<td style="text-align: center;"><div class="action-buttons" style="justify-content: center;">' . $tombolDetail . '</div></td>';
                     $html .= '</tr>';
                 }
             }
@@ -2763,7 +2769,7 @@ public function processCheckOut() {
 
             // Laporan Hasil
             $msgType = ($result['success'] > 0) ? 'success' : 'warning';
-            $msgText = "Import Selesai.<br>✅ Berhasil: <b>{$result['success']}</b> items.<br>⚠️ Gagal/Duplikat: <b>{$result['failed']}</b> items.";
+            $msgText = "Import Selesai.<br>Berhasil: <b>{$result['success']}</b> items.<br>Gagal/Duplikat: <b>{$result['failed']}</b> items.";
             
             $_SESSION['flash_message'] = ['text' => $msgText, 'type' => $msgType];
         } else {
@@ -2781,16 +2787,13 @@ public function processCheckOut() {
         // Hanya proses jika request AJAX (opsional, tapi baik untuk keamanan)
         
         $productModel = $this->model('Product_model');
-        $newCode = $productModel->generateNextCode($prefix);
+        $newCode = $this->model('Product_model')->generateNextCode($prefix);
 
         header('Content-Type: application/json');
         echo json_encode(['code' => $newCode]);
         exit;
     }
 
-    /**
-     * [AKSI] Halaman Cetak Label Barcode
-     */
     /**
      * [AKSI] Halaman Cetak Label Barcode
      */
@@ -2808,17 +2811,20 @@ public function processCheckOut() {
             'judul' => 'Cetak Label Barang',
             'product' => $product,
             
-            // --- PERBAIKAN: URL ke Data Barang, Teks cuma "Kembali" ---
+            // 🔥 PERBAIKAN: Tambahkan key 'kode' dan 'nama' yang dicari oleh View
+            'kode' => $product['kode_barang'], 
+            'nama' => $product['nama_barang'], 
+            
             'back_button' => [
-                'url' => BASE_URL . 'admin/barang', // Tetap ke halaman list barang
-                'label' => 'Kembali'               // Teks tombol jadi singkat
+                'url' => BASE_URL . 'admin/barang',
+                'label' => 'Kembali'
             ]
-            // ----------------------------------------------------------
         ];
 
         $this->view('admin/print_label', $data);
     }
 
+ 
     /**
      * Menampilkan Halaman Detail Barang Masuk (Full Page)
      */
@@ -2834,7 +2840,13 @@ public function processCheckOut() {
 
         $data = [
             'judul' => 'Detail Transaksi Masuk',
-            'transaksi' => $transaksi
+            'transaksi' => $transaksi,
+            // --- TAMBAHKAN KODE INI ---
+            'back_button' => [
+                'url' => BASE_URL . 'admin/riwayatBarangMasuk',
+                'label' => 'Kembali'
+            ]
+            // --------------------------
         ];
 
         $this->view('admin/detail_barang_masuk', $data);
@@ -2844,20 +2856,25 @@ public function processCheckOut() {
      * [AKSI] Export Riwayat Barang Masuk (CSV atau Excel)
      * URL: /admin/exportRiwayatMasuk/csv?start_date=...&end_date=...
      */
+    /**
+     * [AKSI] Export Riwayat Barang Masuk (CSV, Excel, PDF)
+     */
     public function exportRiwayatMasuk($type = 'csv') {
         // 1. Ambil Filter dari URL
         $search = $_GET['search'] ?? '';
         $startDate = $_GET['start_date'] ?? '';
         $endDate = $_GET['end_date'] ?? '';
 
-        // 2. Ambil data dari Model (Gunakan method yang sudah ada, tapi tanpa limit/paginasi)
-        // Kita perlu method baru di model untuk ambil SEMUA data sesuai filter
+        // 2. Ambil data dari Model
         $transactionModel = $this->model('Transaction_model');
         $history = $transactionModel->getAllRiwayatMasukForExport($search, $startDate, $endDate);
         
         $timestamp = date('Y-m-d_H-i');
 
-        // 3. LOGIKA EXCEL (.xls)
+        // 3. BERSIHKAN BUFFER (Penting agar file tidak corrupt)
+        if (ob_get_level()) ob_end_clean();
+
+        // --- A. LOGIKA EXCEL (.xls) ---
         if ($type == 'excel') {
             $filename = "riwayat_masuk_{$timestamp}.xls";
             
@@ -2902,8 +2919,57 @@ public function processCheckOut() {
             echo '</table>';
             exit;
         } 
+
+        // --- B. LOGIKA PDF (Print View) [TAMBAHAN BARU] ---
+        elseif ($type == 'pdf') {
+        // Kita hanya merender struktur HTML tabelnya saja
+        // Javascript di View yang akan mengubah ini jadi PDF
+        ?>
+        <div style="font-family: sans-serif; color: #333; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #152e4d; text-transform: uppercase;">Laporan Riwayat Barang Masuk</h2>
+                <p style="margin: 5px 0; font-size: 12px; color: #666;">
+                    Dicetak pada: <?php echo date('d F Y H:i'); ?> <br>
+                    <?php if($startDate && $endDate): ?>
+                        Periode: <?php echo date('d/m/Y', strtotime($startDate)); ?> s/d <?php echo date('d/m/Y', strtotime($endDate)); ?>
+                    <?php endif; ?>
+                </p>
+            </div>
+            
+            <table border="1" cellspacing="0" cellpadding="6" style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <thead>
+                    <tr style="background-color: #152e4d; color: white;">
+                        <th>Tanggal</th>
+                        <th>Barang</th>
+                        <th>Jumlah</th>
+                        <th>Satuan</th>
+                        <th>Supplier</th>
+                        <th>Diinput Oleh</th>
+                        <th>Lot/Batch</th>
+                        <th>Exp Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($history as $row): ?>
+                    <tr>
+                        <td><?php echo date('d/m/Y H:i', strtotime($row['created_at'])); ?></td>
+                        <td><?php echo htmlspecialchars($row['nama_barang']); ?></td>
+                        <td style="text-align:center; font-weight:bold;"><?php echo $row['jumlah']; ?></td>
+                        <td><?php echo htmlspecialchars($row['nama_satuan']); ?></td>
+                        <td><?php echo htmlspecialchars($row['nama_supplier']); ?></td>
+                        <td><?php echo htmlspecialchars($row['staff_nama']); ?></td>
+                        <td><?php echo htmlspecialchars($row['lot_number']); ?></td>
+                        <td><?php echo ($row['exp_date'] ? date('d/m/Y', strtotime($row['exp_date'])) : '-'); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php
+        exit;
+    }
         
-        // 4. LOGIKA CSV (Default)
+        // --- C. LOGIKA CSV (Default) ---
         else {
             $filename = "riwayat_masuk_{$timestamp}.csv";
             header('Content-Type: text/csv; charset=utf-8');
@@ -2939,7 +3005,11 @@ public function processCheckOut() {
      * [AKSI] Export Laporan Absensi (CSV/Excel)
      * URL: /admin/exportAbsensi?mode=laporan&start_date=...&role=...&search=...
      */
-    public function exportAbsensi() {
+    /**
+     * [AKSI] Export Laporan Absensi (CSV, Excel, PDF)
+     * URL: /admin/exportAbsensi/[type]?mode=laporan&...
+     */
+    public function exportAbsensi($type = 'csv') {
         // 1. Tangkap Filter dari URL
         $filters = [
             'search'     => $_GET['search'] ?? '',
@@ -2949,39 +3019,415 @@ public function processCheckOut() {
             'end_date'   => $_GET['end_date'] ?? date('Y-m-t')
         ];
 
-        // 2. Ambil Data
+        // 2. Ambil Data dari Model
         $absensiModel = $this->model('Absensi_model');
         $data = $absensiModel->getAllAbsensiForExport($filters);
         
-        // 3. Setup CSV
-        $filename = "Laporan_Absensi_" . date('Ymd_His') . ".csv";
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        
-        $output = fopen('php://output', 'w');
-        
-        // Header CSV
-        fputcsv($output, ['Tanggal', 'Nama Karyawan', 'Role', 'Jam Masuk', 'Jam Pulang', 'Status', 'Keterangan']);
+        $timestamp = date('Ymd_His');
+        $filename = "Laporan_Absensi_{$timestamp}";
 
-        // Isi Data
-        foreach ($data as $row) {
-            // Format Jam
-            $masuk = $row['waktu_masuk'] ? date('H:i', strtotime($row['waktu_masuk'])) : '-';
-            $pulang = $row['waktu_pulang'] ? date('H:i', strtotime($row['waktu_pulang'])) : '-';
-            
-            fputcsv($output, [
-                $row['tanggal'],
-                $row['nama_lengkap'],
-                ucfirst($row['role']),
-                $masuk,
-                $pulang,
-                $row['status'],
-                $row['keterangan']
-            ]);
-        }
+        // 3. PEMBERSIHAN BUFFER (Penting untuk Excel/PDF agar tidak corrupt)
+        if (ob_get_level()) ob_end_clean();
+
+        // --- A. LOGIKA EXCEL (.xls) ---
+        if ($type == 'excel') {
+            header("Content-Type: application/vnd.ms-excel");
+            header("Content-Disposition: attachment; filename=\"$filename.xls\"");
+            header("Pragma: no-cache");
+            header("Expires: 0");
+
+            echo '<table border="1">';
+            echo '<thead>
+                    <tr style="background-color:#152e4d; color:#ffffff;">
+                        <th>Tanggal</th>
+                        <th>Nama Karyawan</th>
+                        <th>Role</th>
+                        <th>Jam Masuk</th>
+                        <th>Jam Pulang</th>
+                        <th>Status</th>
+                        <th>Keterangan</th>
+                    </tr>
+                  </thead>';
+            echo '<tbody>';
+            foreach ($data as $row) {
+                $masuk = $row['waktu_masuk'] ? date('H:i', strtotime($row['waktu_masuk'])) : '-';
+                $pulang = $row['waktu_pulang'] ? date('H:i', strtotime($row['waktu_pulang'])) : '-';
+                
+                echo '<tr>';
+                echo '<td>' . $row['tanggal'] . '</td>';
+                echo '<td>' . htmlspecialchars($row['nama_lengkap']) . '</td>';
+                echo '<td>' . ucfirst($row['role']) . '</td>';
+                echo '<td>' . $masuk . '</td>';
+                echo '<td>' . $pulang . '</td>';
+                echo '<td>' . $row['status'] . '</td>';
+                echo '<td>' . htmlspecialchars($row['keterangan']) . '</td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table>';
+            exit;
+        } 
         
-        fclose($output);
-        exit;
+        // --- B. LOGIKA PDF (Print View) ---
+        elseif ($type == 'pdf') {
+            // Kita gunakan tampilan HTML sederhana, lalu browser/user print to PDF
+            // Atau jika Anda punya library PDF (seperti dompdf/mpdf) bisa dipanggil di sini.
+            // Untuk konsistensi dengan `print_barang_full`, kita render HTML view.
+            
+            ?>
+            <!DOCTYPE html>
+            <html lang="id">
+            <head>
+                <meta charset="UTF-8">
+                <title>Laporan Absensi</title>
+                <style>
+                    body { font-family: sans-serif; font-size: 12px; }
+                    h2 { text-align: center; margin-bottom: 5px; color: #152e4d; }
+                    p { text-align: center; margin-top: 0; color: #666; font-size: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+                    th { background-color: #152e4d; color: white; font-weight: bold; }
+                    tr:nth-child(even) { background-color: #f9f9f9; }
+                </style>
+            </head>
+            <body onload="window.print()">
+                <h2>Laporan Rekap Absensi</h2>
+                <p>Periode: <?php echo $filters['start_date']; ?> s/d <?php echo $filters['end_date']; ?></p>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Nama Karyawan</th>
+                            <th>Role</th>
+                            <th>Masuk</th>
+                            <th>Pulang</th>
+                            <th>Status</th>
+                            <th>Ket</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($data as $row): 
+                            $masuk = $row['waktu_masuk'] ? date('H:i', strtotime($row['waktu_masuk'])) : '-';
+                            $pulang = $row['waktu_pulang'] ? date('H:i', strtotime($row['waktu_pulang'])) : '-';
+                        ?>
+                        <tr>
+                            <td><?php echo date('d/m/Y', strtotime($row['tanggal'])); ?></td>
+                            <td><?php echo htmlspecialchars($row['nama_lengkap']); ?></td>
+                            <td><?php echo ucfirst($row['role']); ?></td>
+                            <td><?php echo $masuk; ?></td>
+                            <td><?php echo $pulang; ?></td>
+                            <td><?php echo $row['status']; ?></td>
+                            <td><?php echo htmlspecialchars($row['keterangan']); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </body>
+            </html>
+            <?php
+            exit;
+        }
+
+        // --- C. LOGIKA CSV (Default) ---
+        else {
+            header('Content-Type: text/csv; charset=utf-8');
+            header("Content-Disposition: attachment; filename=\"$filename.csv\"");
+            
+            $output = fopen('php://output', 'w');
+            
+            // Header CSV
+            fputcsv($output, ['Tanggal', 'Nama Karyawan', 'Role', 'Jam Masuk', 'Jam Pulang', 'Status', 'Keterangan']);
+
+            // Isi Data
+            foreach ($data as $row) {
+                $masuk = $row['waktu_masuk'] ? date('H:i', strtotime($row['waktu_masuk'])) : '-';
+                $pulang = $row['waktu_pulang'] ? date('H:i', strtotime($row['waktu_pulang'])) : '-';
+                
+                fputcsv($output, [
+                    $row['tanggal'],
+                    $row['nama_lengkap'],
+                    ucfirst($row['role']),
+                    $masuk,
+                    $pulang,
+                    $row['status'],
+                    $row['keterangan']
+                ]);
+            }
+            
+            fclose($output);
+            exit;
+        }
     }
 
+    /**
+     * Export Riwayat Barang Keluar (CSV / Excel / PDF)
+     */
+    public function exportRiwayatKeluar($type = 'csv')
+    {
+        // 1. Ambil Data dari Filter URL
+        $search = $_GET['search'] ?? '';
+        $startDate = $_GET['start_date'] ?? '';
+        $endDate = $_GET['end_date'] ?? '';
+
+        // 2. Ambil Data dari Model (Menggunakan method baru tanpa limit)
+        $transModel = $this->model('Transaction_model');
+        // 🔥 GANTI: getBarangKeluar() dengan getAllRiwayatKeluarForExport()
+        $data = $transModel->getAllRiwayatKeluarForExport($search, $startDate, $endDate);
+
+        // 3. Logic Export Berdasarkan Tipe
+        $filename = 'riwayat_barang_keluar_' . date('Y-m-d_His');
+
+        if ($type == 'csv') {
+            header('Content-Type: text/csv');
+            header('Content-Disposition: attachment; filename="' . $filename . '.csv"');          
+            $output = fopen('php://output', 'w');
+            fputcsv($output, ['Tanggal', 'Nama Barang', 'Batch (Lot)', 'Jumlah', 'Satuan', 'Staff', 'Keterangan']);
+            // Isi Data
+            foreach ($data as $row) {
+                fputcsv($output, [
+                    date('d-m-Y H:i', strtotime($row['created_at'])), // Gunakan created_at
+                    $row['nama_barang'],
+                    $row['lot_number'] ?: '-',
+                    $row['jumlah'],
+                    $row['nama_satuan'],
+                    $row['staff_nama'],
+                    $row['keterangan']
+                ]);
+            }
+            fclose($output);
+            exit;
+
+        } elseif ($type == 'excel') {
+            // ... (Logika Excel tetap sama) ...
+            header("Content-Type: application/vnd.ms-excel");
+            header("Content-Disposition: attachment; filename=\"$filename.xls\"");
+            
+            echo "
+            <table border='1'>
+                <thead>
+                    <tr style='background-color:#f2f2f2;'>
+                        <th>Tanggal Keluar</th>
+                        <th>Nama Barang</th>
+                        <th>Batch (Lot)</th>
+                        <th>Jumlah</th>
+                        <th>Satuan</th>
+                        <th>Staff</th>
+                        <th>Keterangan</th>
+                    </tr>
+                </thead>
+                <tbody>";
+            
+            foreach ($data as $row) {
+                echo "
+                <tr>
+                    <td>" . date('d-m-Y H:i', strtotime($row['created_at'])) . "</td>
+                    <td>{$row['nama_barang']}</td>
+                    <td>{$row['lot_number']}</td>
+                    <td style='text-align:center;'>{$row['jumlah']}</td>
+                    <td>{$row['nama_satuan']}</td>
+                    <td>{$row['staff_nama']}</td>
+                    <td>{$row['keterangan']}</td>
+                </tr>";
+            }
+            
+            echo "</tbody></table>";
+            exit;
+
+        } elseif ($type == 'pdf') {
+            // --- LOGIKA PDF (menggunakan struktur yang sudah ada) ---
+            ?>
+            <div style="font-family: sans-serif; color: #333; padding: 20px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0; color: #152e4d; text-transform: uppercase;">Laporan Riwayat Barang Keluar</h2>
+                    <p style="margin: 5px 0; font-size: 12px; color: #666;">
+                        Dicetak pada: <?php echo date('d F Y H:i'); ?> <br>
+                        <?php if($startDate && $endDate): ?>
+                            Periode: <?php echo date('d/m/Y', strtotime($startDate)); ?> s/d <?php echo date('d/m/Y', strtotime($endDate)); ?>
+                        <?php endif; ?>
+                    </p>
+                </div>
+                
+                <table border="1" cellspacing="0" cellpadding="6" style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                    <thead>
+                        <tr style="background-color: #152e4d; color: white;">
+                            <th>Tanggal</th>
+                            <th>Barang</th>
+                            <th>Batch</th>
+                            <th>Jumlah</th>
+                            <th>Satuan</th>
+                            <th>Staff</th>
+                            <th>Keterangan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($data as $row): ?>
+                        <tr>
+                            <td><?php echo date('d/m/Y H:i', strtotime($row['created_at'])); ?></td>
+                            <td><?php echo htmlspecialchars($row['nama_barang']); ?></td>
+                            <td><?php echo htmlspecialchars($row['lot_number'] ?: '-'); ?></td>
+                            <td style="text-align:center; font-weight:bold;"><?php echo $row['jumlah']; ?></td>
+                            <td><?php echo htmlspecialchars($row['nama_satuan']); ?></td>
+                            <td><?php echo htmlspecialchars($row['staff_nama']); ?></td>
+                            <td><?php echo htmlspecialchars($row['keterangan']); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php
+            exit;
+        }
+    }
+    // manajemengudang/app/controllers/AdminController.php
+
+    /**
+     * Menampilkan Halaman Detail Barang Keluar (Full Page)
+     * (BARU - Dibuat Mirip detailBarangMasuk)
+     */
+    public function detailBarangKeluar($id) {
+        $transModel = $this->model('Transaction_model');
+        // Anggap ada fungsi getTransactionById yang akan menarik semua detail
+        $transaksi = $transModel->getTransactionById($id); 
+
+        if (!$transaksi || $transaksi['tipe_transaksi'] != 'keluar') {
+            $_SESSION['flash_message'] = ['text' => 'Data transaksi keluar tidak ditemukan.', 'type' => 'error'];
+            header('Location: ' . BASE_URL . 'admin/riwayatBarangKeluar');
+            exit;
+        }
+
+        // Kita perlu mem-parsing JSON bukti foto
+        $transaksi['bukti_foto_array'] = $transaksi['bukti_foto'] ? json_decode($transaksi['bukti_foto'], true) : [];
+
+        $data = [
+            'judul' => 'Detail Transaksi Keluar',
+            'transaksi' => $transaksi,
+            'back_button' => [
+                'url' => BASE_URL . 'admin/riwayatBarangKeluar',
+                'label' => 'Kembali'
+            ]
+        ];
+
+        // Pastikan Anda membuat file view ini
+        $this->view('admin/detail_barang_keluar', $data);
+    }
+
+    /**
+     * [AKSI] Simpan Barang Baru
+     * Menangani input dari Form Tambah Barang (Opsi B)
+     */
+    public function storeBarang() {
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            
+            // 1. PROSES UPLOAD FOTO (Jika ada)
+            $fotoNama = null;
+            if (isset($_FILES['foto_barang']) && $_FILES['foto_barang']['error'] == UPLOAD_ERR_OK) {
+                $file = $_FILES['foto_barang'];
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+
+                if (in_array($ext, $allowed) && $file['size'] <= 2000000) { // Max 2MB
+                    $newName = "produk_" . time() . "." . $ext;
+                    $dest = APPROOT . '/../public/uploads/barang/' . $newName;
+                    
+                    if (move_uploaded_file($file['tmp_name'], $dest)) {
+                        $fotoNama = $newName;
+                    }
+                }
+            }
+
+            // 2. SIAPKAN DATA
+            // Perhatikan logika 'isset' untuk checkbox bisa_dipinjam & lacak_lot_serial
+            $data = [
+                'kode_barang'   => trim($_POST['kode_barang']),
+                'nama_barang'   => trim($_POST['nama_barang']),
+                'foto_barang'   => $fotoNama,
+                'deskripsi'     => $_POST['deskripsi'],
+                'kategori_id'   => $_POST['kategori_id'],
+                'merek_id'      => $_POST['merek_id'],
+                'satuan_id'     => $_POST['satuan_id'],
+                
+                // Stok Minimum: Jika kosong (mode Aset), set ke 0
+                'stok_minimum'  => !empty($_POST['stok_minimum']) ? (int)$_POST['stok_minimum'] : 0,
+                
+                // PENTING: Menangkap hasil logika "Jenis Barang" dari Frontend
+                // Jika checkbox dicentang, $_POST ada isinya -> simpan 1
+                // Jika tidak dicentang, $_POST tidak ada -> simpan 0
+                'bisa_dipinjam'    => isset($_POST['bisa_dipinjam']) ? 1 : 0,
+                'lacak_lot_serial' => isset($_POST['lacak_lot_serial']) ? 1 : 0,
+                
+                // Lokasi Rak (Untuk referensi awal)
+                // Pastikan Model createProduct Anda mendukung ini, jika tidak, field ini akan diabaikan model
+                'lokasi_id'     => $_POST['lokasi_id'] ?? null 
+            ];
+
+            // 3. PANGGIL MODEL
+            if ($this->model('Product_model')->createProduct($data)) {
+                $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Barang berhasil ditambahkan!'];
+                header('Location: ' . BASE_URL . 'admin/barang');
+            } else {
+                $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Gagal menambahkan barang (Kode mungkin duplikat).'];
+                header('Location: ' . BASE_URL . 'admin/addBarang');
+            }
+            exit;
+        }
+    }
+
+    /**
+     * [AKSI] Update Barang
+     */
+    public function updateBarang() {
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            
+            $id = $_POST['id'];
+            $fotoNama = $_POST['foto_lama'] ?? null; 
+
+            // 1. Cek Upload Foto Baru
+            if (isset($_FILES['foto_barang']) && $_FILES['foto_barang']['error'] == UPLOAD_ERR_OK) {
+                $file = $_FILES['foto_barang'];
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+
+                if (in_array($ext, $allowed) && $file['size'] <= 2000000) {
+                    $newName = "produk_" . time() . "." . $ext;
+                    $dest = APPROOT . '/../public/uploads/barang/' . $newName;
+                    
+                    if (move_uploaded_file($file['tmp_name'], $dest)) {
+                        // Hapus foto lama jika ada dan bukan default
+                        if ($fotoNama && file_exists(APPROOT . '/../public/uploads/barang/' . $fotoNama)) {
+                            unlink(APPROOT . '/../public/uploads/barang/' . $fotoNama);
+                        }
+                        $fotoNama = $newName;
+                    }
+                }
+            }
+
+            // 2. Data Update
+            $data = [
+                'product_id'    => $id,
+                'kode_barang'   => trim($_POST['kode_barang']),
+                'nama_barang'   => trim($_POST['nama_barang']),
+                'foto_barang'   => $fotoNama,
+                'deskripsi'     => $_POST['deskripsi'],
+                'kategori_id'   => $_POST['kategori_id'],
+                'merek_id'      => $_POST['merek_id'],
+                'satuan_id'     => $_POST['satuan_id'],
+                'stok_minimum'  => !empty($_POST['stok_minimum']) ? (int)$_POST['stok_minimum'] : 0,
+                
+                // Logic Jenis Barang
+                'bisa_dipinjam'    => isset($_POST['bisa_dipinjam']) ? 1 : 0,
+                'lacak_lot_serial' => isset($_POST['lacak_lot_serial']) ? 1 : 0,
+                
+                'lokasi_id'     => $_POST['lokasi_id'] ?? null
+            ];
+
+            if ($this->model('Product_model')->updateProduct($data)) {
+                $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Data barang berhasil diperbarui!'];
+            } else {
+                $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Gagal memperbarui data.'];
+            }
+            header('Location: ' . BASE_URL . 'admin/barang');
+            exit;
+        }
+    }
 }
+    

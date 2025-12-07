@@ -11,206 +11,164 @@
     } else {
         require_once APPROOT . '/views/templates/sidebar_peminjam.php';
     }
+
+    // Helper Foto Profil
+    $fotoPath = !empty($data['user']['foto_profil']) 
+        ? BASE_URL . 'uploads/profil/' . $data['user']['foto_profil'] 
+        : BASE_URL . 'img/default-user.png';
+
+    if (!empty($data['user']['foto_profil']) && !file_exists(APPROOT . '/../public/uploads/profil/' . $data['user']['foto_profil'])) {
+        $fotoPath = 'https://ui-avatars.com/api/?name=' . urlencode($data['user']['nama_lengkap']) . '&background=random';
+    } elseif (empty($data['user']['foto_profil'])) {
+        $fotoPath = 'https://ui-avatars.com/api/?name=' . urlencode($data['user']['nama_lengkap']) . '&background=e0f2fe&color=152e4d';
+    }
 ?>
 
 <main class="app-content">
-    
-    <div class="content-header">
-        <h1>Profil Saya</h1>
-        <a href="<?php echo BASE_URL; ?>profile/absensi" class="btn btn-primary">
-            📅 Lihat Riwayat Absensi
-        </a>
-    </div>
+    <?php if(isset($_SESSION['flash_message'])): ?>
+        <div class="flash-message <?php echo $_SESSION['flash_message']['type']; ?>">
+            <?php echo $_SESSION['flash_message']['text']; ?>
+        </div>
+        <?php unset($_SESSION['flash_message']); ?>
+    <?php endif; ?>
 
-    <?php
-        if(isset($_SESSION['flash_message'])) {
-            $flash = $_SESSION['flash_message'];
-            echo '<div class="flash-message ' . $flash['type'] . '">' . $flash['text'] . '</div>';
-            unset($_SESSION['flash_message']);
-        }
-    ?>
-
-    <div class="form-container">
-        <form action="<?php echo BASE_URL; ?>profile/processProfileInfo" method="POST" enctype="multipart/form-data">
-            
-            <fieldset>
-                <legend>Informasi Pribadi</legend>
+    <div class="profile-grid-3-cols">
+        
+        <div class="card card-profile-center">
+            <div class="profile-photo-wrapper">
+                <img src="<?php echo $fotoPath; ?>?v=<?php echo time(); ?>" id="previewFoto" alt="Foto Profil">
                 
-                <div class="form-group" style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
-                    <div style="
-                        width: 120px; 
-                        height: 120px; 
-                        border-radius: 50%; 
-                        overflow: hidden; 
-                        border: 3px solid #ddd; 
-                        background: #f0f0f0;
-                        flex-shrink: 0;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        position: relative;
-                    ">
-                        <?php if (!empty($data['user']['foto_profil'])): ?>
-                            <img src="<?php echo BASE_URL; ?>uploads/profil/<?php echo $data['user']['foto_profil']; ?>?v=<?php echo time(); ?>" 
-                                 alt="Foto Profil" 
-                                 style="width: 100%; height: 100%; object-fit: cover;">
-                        <?php else: ?>
-                            <span style="font-size: 50px; color: #ccc;">👤</span>
-                        <?php endif; ?>
-                    </div>
-
-                    <div style="flex: 1;">
-                        <label for="foto_profil" style="font-weight: bold;">Ganti Foto Profil</label>
-                        <input type="file" id="foto_profil" name="foto_profil" accept="image/png, image/jpeg, image/jpg" class="form-control" style="padding: 5px;">
-                        <small style="color: #666; display: block; margin-top: 5px;">
-                            Format: JPG, JPEG, PNG. Maksimal 2MB.<br>
-                            (Biarkan kosong jika tidak ingin mengganti foto)
-                        </small>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="nama_lengkap">Nama Lengkap (Wajib)</label>
-                    <input type="text" id="nama_lengkap" name="nama_lengkap" 
-                           value="<?php echo htmlspecialchars($data['user']['nama_lengkap']); ?>" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="email">Email (Login)</label>
-                    <input type="email" id="email" name="email" 
-                           value="<?php echo htmlspecialchars($data['user']['email']); ?>" 
-                           readonly 
-                           style="background-color: #e9ecef; cursor: not-allowed; color: #6c757d;">
-                    <small>Hanya Admin yang dapat mengubah email.</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="role">Role / Jabatan</label>
-                    <input type="text" id="role" name="role" 
-                           value="<?php echo ucfirst(htmlspecialchars($data['user']['role'])); ?>" 
-                           readonly 
-                           style="background-color: #e9ecef; cursor: not-allowed; color: #6c757d; font-weight: bold;">
-                    <small>Hubungi Admin jika ada perubahan jabatan.</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="tempat_lahir">Tempat Lahir</label>
-                    <input type="text" id="tempat_lahir" name="tempat_lahir" 
-                           value="<?php echo htmlspecialchars($data['user']['tempat_lahir'] ?? ''); ?>"
-                           placeholder="Contoh: Bandung">
-                </div>
-
-                <div class="form-group">
-                    <label for="tanggal_lahir">Tanggal Lahir</label>
-                    <input type="date" id="tanggal_lahir" name="tanggal_lahir" 
-                           value="<?php echo htmlspecialchars($data['user']['tanggal_lahir'] ?? ''); ?>">
-                </div>
-
-                <div class="form-group">
-                    <label for="agama">Agama</label>
-                    <select id="agama" name="agama">
-                        <option value="">-- Pilih Agama --</option>
-                        <option value="Islam" <?php if(($data['user']['agama'] ?? '') == 'Islam') echo 'selected'; ?>>Islam</option>
-                        <option value="Kristen" <?php if(($data['user']['agama'] ?? '') == 'Kristen') echo 'selected'; ?>>Kristen</option>
-                        <option value="Katolik" <?php if(($data['user']['agama'] ?? '') == 'Katolik') echo 'selected'; ?>>Katolik</option>
-                        <option value="Hindu" <?php if(($data['user']['agama'] ?? '') == 'Hindu') echo 'selected'; ?>>Hindu</option>
-                        <option value="Buddha" <?php if(($data['user']['agama'] ?? '') == 'Buddha') echo 'selected'; ?>>Buddha</option>
-                        <option value="Konghucu" <?php if(($data['user']['agama'] ?? '') == 'Konghucu') echo 'selected'; ?>>Konghucu</option>
-                    </select>
-                </div>
-            </fieldset>
-            
-            <fieldset>
-                <legend>Info Kontak & Alamat</legend>
-                
-                <div class="form-group">
-                    <label for="telepon">Nomor Telepon / HP</label>
-                    <input type="tel" id="telepon" name="telepon" 
-                           value="<?php echo htmlspecialchars($data['user']['telepon'] ?? ''); ?>"
-                           placeholder="Contoh: 08123456789"
-                           inputmode="numeric" 
-                           pattern="[0-9]*">
-                </div>
-                
-                <div class="form-group">
-                    <label for="alamat">Alamat Lengkap</label>
-                    <textarea id="alamat" name="alamat" rows="3" 
-                              placeholder="Nama Jalan, No. Rumah, RT/RW, Kelurahan, Kecamatan"><?php echo htmlspecialchars($data['user']['alamat'] ?? ''); ?></textarea>
-                </div>
-
-                <div style="display: flex; gap: 20px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label for="kota">Kota / Kabupaten</label>
-                        <input type="text" id="kota" name="kota" 
-                               value="<?php echo htmlspecialchars($data['user']['kota'] ?? ''); ?>"
-                               placeholder="Contoh: Bandung">
-                    </div>
-
-                    <div class="form-group" style="flex: 1;">
-                        <label for="provinsi">Provinsi</label>
-                        <input type="text" id="provinsi" name="provinsi" 
-                               value="<?php echo htmlspecialchars($data['user']['provinsi'] ?? ''); ?>"
-                               placeholder="Contoh: Jawa Barat">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="kode_pos">Kode Pos</label>
-                    <input type="text" id="kode_pos" name="kode_pos" 
-                           value="<?php echo htmlspecialchars($data['user']['kode_pos'] ?? ''); ?>"
-                           placeholder="Contoh: 40123"
-                           inputmode="numeric" 
-                           pattern="[0-9]*"
-                           maxlength="5">
-                </div>
-            </fieldset>
-            
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Simpan Perubahan Profil</button>
+                <button type="button" class="btn-upload-trigger" onclick="document.getElementById('inputFoto').click()">
+                    <i class="ph ph-camera"></i>
+                </button>
             </div>
-        </form>
-    </div>
 
-    <div class="form-container" style="margin-top: 30px;">
-        <form action="<?php echo BASE_URL; ?>profile/processChangePassword" method="POST">
-            <fieldset>
-                <legend>Ganti Password Mandiri</legend>
-                
-                <div class="form-group">
-                    <label for="old_password">
-                        Password Lama 
-                        <span style="cursor: pointer; color: #007bff; margin-left: 5px; font-size: 1.1em;" 
-                              title="Jika lupa password lama silahkan hubungi admin"
-                              onclick="Swal.fire({
-                                  icon: 'info',
-                                  title: 'Lupa Password?',
-                                  text: 'Jika Anda lupa password lama, silakan hubungi Admin untuk mereset password Anda.',
-                                  confirmButtonText: 'Mengerti'
-                              })">
-                            ⓘ
-                        </span>
-                    </label>
-                    <input type="password" id="old_password" name="old_password" required placeholder="Masukkan password saat ini">
-                </div>
-                
-                <div class="form-group">
-                    <label for="new_password">Password Baru</label>
-                    <input type="password" id="new_password" name="new_password" required placeholder="Minimal 6 karakter">
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirm_password">Konfirmasi Password Baru</label>
-                    <input type="password" id="confirm_password" name="confirm_password" required placeholder="Ulangi password baru">
-                </div>
+            <h3 class="user-name-title"><?php echo htmlspecialchars($data['user']['nama_lengkap']); ?></h3>
+            <span class="user-role-pill <?php echo strtolower($data['user']['role']); ?>">
+                <?php echo ucfirst($data['user']['role']); ?>
+            </span>
 
-            </fieldset>
-            
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Ubah Password Saya</button>
+            <div class="contact-info-list">
+                <div class="contact-item">
+                    <i class="ph ph-envelope-simple"></i>
+                    <span><?php echo htmlspecialchars($data['user']['email']); ?></span>
+                </div>
+                <div class="contact-item">
+                    <i class="ph ph-phone"></i>
+                    <span><?php echo htmlspecialchars($data['user']['telepon'] ?? '-'); ?></span>
+                </div>
             </div>
-        </form>
+
+            <div style="margin-top: 25px; width: 100%;">
+                <a href="<?php echo BASE_URL; ?>profile/absensi" class="btn btn-outline-primary btn-block">
+                    <i class="ph ph-calendar-check"></i> Riwayat Absensi
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header-minimal">
+                <h4><i class="ph ph-user-gear"></i> Biodata Diri</h4>
+            </div>
+            
+            <form action="<?php echo BASE_URL; ?>profile/processProfileInfo" method="POST" enctype="multipart/form-data">
+                <input type="file" id="inputFoto" name="foto_profil" accept="image/*" style="display: none;" onchange="previewImage(this)">
+                
+                <div class="form-group-sm">
+                    <label>Nama Lengkap</label>
+                    <input type="text" name="nama_lengkap" value="<?php echo htmlspecialchars($data['user']['nama_lengkap']); ?>" required class="form-control">
+                </div>
+
+                <div class="form-group-sm">
+                    <label>Nomor Telepon / WA</label>
+                    <input type="text" name="telepon" value="<?php echo htmlspecialchars($data['user']['telepon'] ?? ''); ?>" class="form-control">
+                </div>
+
+                <div class="row-grid-2">
+                    <div class="form-group-sm">
+                        <label>Tempat Lahir</label>
+                        <input type="text" name="tempat_lahir" value="<?php echo htmlspecialchars($data['user']['tempat_lahir'] ?? ''); ?>" class="form-control">
+                    </div>
+                    <div class="form-group-sm">
+                        <label>Tanggal Lahir</label>
+                        <input type="date" name="tanggal_lahir" value="<?php echo htmlspecialchars($data['user']['tanggal_lahir'] ?? ''); ?>" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group-sm">
+                    <label>Alamat</label>
+                    <textarea name="alamat" rows="2" class="form-control"><?php echo htmlspecialchars($data['user']['alamat'] ?? ''); ?></textarea>
+                </div>
+                
+                <div class="row-grid-2">
+                     <div class="form-group-sm">
+                        <label>Kota</label>
+                        <input type="text" name="kota" value="<?php echo htmlspecialchars($data['user']['kota'] ?? ''); ?>" class="form-control">
+                    </div>
+                     <div class="form-group-sm">
+                        <label>Provinsi</label>
+                        <input type="text" name="provinsi" value="<?php echo htmlspecialchars($data['user']['provinsi'] ?? ''); ?>" class="form-control">
+                    </div>
+                </div>
+
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary btn-sm-block">
+                        <i class="ph ph-floppy-disk"></i> Simpan Biodata
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-header-minimal">
+                <h4><i class="ph ph-lock-key"></i> Keamanan Akun</h4>
+            </div>
+
+            <form action="<?php echo BASE_URL; ?>profile/processChangePassword" method="POST">
+                <div class="form-group-sm">
+                    <label>Password Lama</label>
+                    <input type="password" name="old_password" required class="form-control" placeholder="••••••••">
+                </div>
+                
+                <div class="separator-dashed"></div>
+
+                <div class="form-group-sm">
+                    <label>Password Baru</label>
+                    <input type="password" name="new_password" required class="form-control" placeholder="Minimal 6 karakter">
+                </div>
+                
+                <div class="form-group-sm">
+                    <label>Konfirmasi Password Baru</label>
+                    <input type="password" name="confirm_password" required class="form-control" placeholder="Ulangi password baru">
+                </div>
+
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="submit" class="btn btn-warning btn-sm-block">
+                        <i class="ph ph-key"></i> Update Password
+                    </button>
+                </div>
+            </form>
+
+            <div class="security-alert">
+                <i class="ph ph-shield-check"></i>
+                <p>Gunakan password yang kuat dan jangan bagikan ke siapapun.</p>
+            </div>
+        </div>
+
     </div>
+
 </main>
-<?php
-    require_once APPROOT . '/views/templates/footer.php';
-?>
+
+<script>
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewFoto').src = e.target.result;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>
+
+<?php require_once APPROOT . '/views/templates/footer.php'; ?>
